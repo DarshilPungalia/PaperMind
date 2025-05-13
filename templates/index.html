@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document Processor</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+        select, input[type="text"], textarea, button {
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #1f1f1f;
+            color: white;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        label {
+            margin-top: 20px;
+            display: block;
+        }
+        button {
+            background-color: #333;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #444;
+        }
+        #result {
+            margin-top: 30px;
+            white-space: pre-wrap;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #1f1f1f;
+            min-height: 100px;
+        }
+        .loader {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .loader:after {
+            content: "Processing...";
+            display: inline-block;
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: "Processing."; }
+            40% { content: "Processing.."; }
+            60%, 100% { content: "Processing..."; }
+        }
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Document Processor</h1>
+    <form id="docForm" action="/" method="POST" enctype="multipart/form-data">
+        <label for="file_type">File Type:</label>
+        <select name="file_type" id="file_type" required>
+            <option value="text">Text File</option>
+            <option value="pdf">PDF File</option>
+            <option value="link">Web URL</option>
+            <option value="pasted">Pasted Text</option>
+        </select>
+
+        <div id="file_input_container">
+            <label for="file">Upload File:</label>
+            <input type="file" name="file" id="file">
+        </div>
+
+        <div id="url_input_container" style="display: none;">
+            <label for="url">Enter URL:</label>
+            <input type="text" name="url" id="url">
+        </div>
+
+        <div id="paste_input_container" style="display: none;">
+            <label for="pasted">Paste Text:</label>
+            <textarea name="pasted" id="pasted" rows="8"></textarea>
+        </div>
+
+        <label for="query">Task:</label>
+        <select name="query" id="query" required>
+            <option value="summarise">Summarise</option>
+            <option value="faq">Generate FAQs</option>
+        </select>
+
+        <button type="submit" id="submitBtn">Submit</button>
+    </form>
+    
+    <div class="loader" id="loader"></div>
+    <div id="result">{{ result|safe }}</div>
+
+    <script>
+        const fileTypeSelect = document.getElementById("file_type");
+        const fileInputContainer = document.getElementById("file_input_container");
+        const urlInputContainer = document.getElementById("url_input_container");
+        const pasteInputContainer = document.getElementById("paste_input_container");
+        const form = document.getElementById("docForm");
+        const loader = document.getElementById("loader");
+        const submitBtn = document.getElementById("submitBtn");
+        const resultDiv = document.getElementById("result");
+
+        updateInputVisibility(fileTypeSelect.value);
+
+        fileTypeSelect.addEventListener("change", function () {
+            updateInputVisibility(fileTypeSelect.value);
+        });
+
+        function updateInputVisibility(fileType) {
+            fileInputContainer.style.display = fileType === "text" || fileType === "pdf" ? "block" : "none";
+            urlInputContainer.style.display = fileType === "link" ? "block" : "none";
+            pasteInputContainer.style.display = fileType === "pasted" ? "block" : "none";
+        }
+
+        form.addEventListener("submit", function (e) {
+            const fileType = fileTypeSelect.value;
+            
+            if (fileType === "text" || fileType === "pdf") {
+                const fileInput = document.getElementById("file");
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    alert("Please select a file to upload.");
+                    e.preventDefault();
+                    return false;
+                }
+            } else if (fileType === "link") {
+                const urlInput = document.getElementById("url");
+                if (!urlInput.value.trim()) {
+                    alert("Please enter a URL.");
+                    e.preventDefault();
+                    return false;
+                }
+            } else if (fileType === "pasted") {
+                const pastedInput = document.getElementById("pasted");
+                if (!pastedInput.value.trim()) {
+                    alert("Please paste some text.");
+                    e.preventDefault();
+                    return false;
+                }
+            }
+            
+            loader.style.display = "block";
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Processing...";
+        });
+        
+        function applyTypingEffect() {
+            const resultContent = resultDiv.innerHTML;
+            if (!resultContent || resultContent.trim() === '') return;
+            
+            resultDiv.innerHTML = '';
+            let i = 0;
+            
+            function typeNextChar() {
+                if (i < resultContent.length) {
+                    resultDiv.innerHTML += resultContent.charAt(i);
+                    i++;
+                    setTimeout(typeNextChar, 5);
+                }
+            }
+            
+            typeNextChar();
+        }
+        
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fileType = urlParams.get('file_type') || "text"; 
+            
+            fileTypeSelect.value = fileType;
+            updateInputVisibility(fileType);
+            
+            // Apply typing effect if there's content
+            if (resultDiv.innerHTML && resultDiv.innerHTML.trim() !== '') {
+                applyTypingEffect();
+            }
+        };
+    </script>
+</body>
+</html>
