@@ -2,11 +2,13 @@ from flask import Flask, request, render_template
 from werkzeug.utils import secure_filename
 import os
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebBaseLoader
+from langchain_community.document_loaders.python import PythonLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.document_loaders.parsers import RapidOCRBlobParser
 from langchain_core.runnables import RunnableBranch, RunnableSequence, RunnablePassthrough
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -34,6 +36,8 @@ faq_prompt = PromptTemplate(
 
 def file_loader(file_type, request):
     content = ''
+    splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
+
 
     if file_type == 'text':
         file = request.files['file']
@@ -46,6 +50,13 @@ def file_loader(file_type, request):
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
         file.save(file_path)
         loader = PyMuPDFLoader(file_path, mode="page", images_inner_format="text", images_parser=RapidOCRBlobParser())
+    
+    elif file_type == 'python':
+        file = request.files['file']
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+        file.save(file_path)
+        loader = PythonLoader(file_path)
+        splitter = splitter.from_language('python')
 
     elif file_type == 'link':
         url = request.form['url']
@@ -56,8 +67,10 @@ def file_loader(file_type, request):
 
     for page in loader.lazy_load():
         content += page.page_content
+    
+    chunks = splitter.split_text(content)
 
-    return content
+    return chunks
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
