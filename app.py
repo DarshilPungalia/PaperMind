@@ -3,6 +3,7 @@ from werkzeug.utils import secure_filename
 import os
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebBaseLoader
 from langchain_community.document_loaders.python import PythonLoader
+from langchain_community.document_loaders import TextLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -34,6 +35,88 @@ faq_prompt = PromptTemplate(
     input_variables=['text']
 )
 
+extension_to_language = {
+    "cpp": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "hpp": "cpp",
+    "h": "cpp",
+
+    "go": "go",
+
+    "java": "java",
+
+    "kt": "kotlin",
+    "kts": "kotlin",
+
+    "js": "js",
+    "mjs": "js",
+    "cjs": "js",
+
+    "ts": "ts",
+    "tsx": "ts",
+
+    "php": "php",
+    "phtml": "php",
+    "php3": "php",
+    "php4": "php",
+
+    "proto": "proto",
+
+    "py": "python",
+    "pyw": "python",
+
+    "rst": "rst",
+
+    "rb": "ruby",
+    "erb": "ruby",
+
+    "rs": "rust",
+
+    "scala": "scala",
+    "sc": "scala",
+
+    "swift": "swift",
+
+    "md": "markdown",
+    "markdown": "markdown",
+
+    "tex": "latex",
+    "ltx": "latex",
+    "latex": "latex",
+
+    "html": "html",
+    "htm": "html",
+
+    "sol": "sol",
+
+    "cs": "csharp",
+
+    "cob": "cobol",
+    "cbl": "cobol",
+    "cpy": "cobol",
+
+    "c": "c",
+
+    "lua": "lua",
+
+    "pl": "perl",
+    "pm": "perl",
+    "t": "perl",
+    "pod": "perl",
+
+    "hs": "haskell",
+    "lhs": "haskell",
+
+    "ex": "elixir",
+    "exs": "elixir",
+
+    "ps1": "powershell",
+    "psm1": "powershell",
+    "psd1": "powershell",
+}
+
+
 def file_loader(file_type, request):
     content = ''
     splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
@@ -51,12 +134,13 @@ def file_loader(file_type, request):
         file.save(file_path)
         loader = PyMuPDFLoader(file_path, mode="page", images_inner_format="text", images_parser=RapidOCRBlobParser())
     
-    elif file_type == 'python':
+    elif file_type == 'code':
         file = request.files['file']
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
         file.save(file_path)
-        loader = PythonLoader(file_path)
-        splitter = splitter.from_language('python')
+        loader = TextLoader(file_path)
+        ext = file_path.split('.')[-1]
+        splitter = splitter.from_language(extension_to_language[ext])
 
     elif file_type == 'link':
         url = request.form['url']

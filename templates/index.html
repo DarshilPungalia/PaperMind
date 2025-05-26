@@ -68,7 +68,7 @@
         <select name="file_type" id="file_type" required>
             <option value="text">Text File</option>
             <option value="pdf">PDF File</option>
-            <option value="python">Python File</option>
+            <option value="code">Code File</option>
             <option value="link">Web URL</option>
             <option value="pasted">Pasted Text</option>
         </select>
@@ -118,7 +118,7 @@
         });
 
         function updateInputVisibility(fileType) {
-            fileInputContainer.style.display = fileType === "text" || fileType === "pdf" || fileType === "python" ? "block" : "none";
+            fileInputContainer.style.display = fileType === "text" || fileType === "pdf" || fileType === "code" ? "block" : "none";
             urlInputContainer.style.display = fileType === "link" ? "block" : "none";
             pasteInputContainer.style.display = fileType === "pasted" ? "block" : "none";
         }
@@ -126,7 +126,7 @@
         form.addEventListener("submit", function (e) {
             const fileType = fileTypeSelect.value;
             
-            if (fileType === "text" || fileType === "pdf" || fileType === "python") {
+            if (fileType === "text" || fileType === "pdf" || fileType === "code") {
                 const fileInput = document.getElementById("file");
                 if (!fileInput.files || fileInput.files.length === 0) {
                     alert("Please select a file to upload.");
