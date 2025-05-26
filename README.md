@@ -8,7 +8,7 @@ This is a Flask-based web application that allows users to process different typ
 
 ## Features
 
-- Upload `.txt`, `.pdf` or `.py` files and extract their content
+- Upload `.txt`, `.pdf` or code files of common programming languages and extract their content
 - Input a website URL or paste raw text
 - Choose between **"Summarise"** or **"FAQ"** modes
 - Leverages Google Gemini (via LangChain) for AI-powered processing
