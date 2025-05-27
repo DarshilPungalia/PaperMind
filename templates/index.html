@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Document Processor</title>
+    <title>Paper Mind</title>
     <style>
         body {
             background-color: #121212;
@@ -62,7 +62,7 @@
     </style>
 </head>
 <body>
-    <h1>Document Processor</h1>
+    <h1>Paper Mind</h1>
     <form id="docForm" action="/" method="POST" enctype="multipart/form-data">
         <label for="file_type">File Type:</label>
         <select name="file_type" id="file_type" required>
@@ -76,6 +76,7 @@
         <div id="file_input_container">
             <label for="file">Upload File:</label>
             <input type="file" name="file" id="file">
+            <small id="fileHint" style="color: #bbb;"></small>
         </div>
 
         <div id="url_input_container" style="display: none;">
@@ -105,12 +106,13 @@
         const fileInputContainer = document.getElementById("file_input_container");
         const urlInputContainer = document.getElementById("url_input_container");
         const pasteInputContainer = document.getElementById("paste_input_container");
+        const fileHint = document.getElementById("fileHint");
+        const fileInput = document.getElementById("file");
         const form = document.getElementById("docForm");
         const loader = document.getElementById("loader");
         const submitBtn = document.getElementById("submitBtn");
         const resultDiv = document.getElementById("result");
 
-        // Set initial display based on default selection
         updateInputVisibility(fileTypeSelect.value);
 
         fileTypeSelect.addEventListener("change", function () {
@@ -121,13 +123,46 @@
             fileInputContainer.style.display = fileType === "text" || fileType === "pdf" || fileType === "code" ? "block" : "none";
             urlInputContainer.style.display = fileType === "link" ? "block" : "none";
             pasteInputContainer.style.display = fileType === "pasted" ? "block" : "none";
+
+            if (fileType === "text") {
+                fileInput.setAttribute("accept", ".txt");
+                fileHint.textContent = "Allowed: .txt files only";
+            } else if (fileType === "pdf") {
+                fileInput.setAttribute("accept", ".pdf");
+                fileHint.textContent = "Allowed: .pdf files only";
+            } else if (fileType === "code") {
+                const codeExtensions = [
+                    ".cpp", ".cc", ".cxx", ".hpp", ".h",
+                    ".go", ".java", ".kt", ".kts",
+                    ".js", ".mjs", ".cjs",
+                    ".ts", ".tsx",
+                    ".php", ".phtml", ".php3", ".php4",
+                    ".proto", ".py", ".pyw", ".rst",
+                    ".rb", ".erb", ".rs",
+                    ".scala", ".sc", ".swift",
+                    ".md", ".markdown",
+                    ".tex", ".ltx", ".latex",
+                    ".html", ".htm", ".sol",
+                    ".cs",
+                    ".cob", ".cbl", ".cpy",
+                    ".c", ".lua",
+                    ".pl", ".pm", ".t", ".pod",
+                    ".hs", ".lhs",
+                    ".ex", ".exs",
+                    ".ps1", ".psm1", ".psd1"
+                ];
+                fileInput.setAttribute("accept", codeExtensions.join(","));
+                fileHint.textContent = "Allowed: Programming files (.py, .js, .cpp, .java, .html, .cs, etc.)";
+            } else {
+                fileInput.removeAttribute("accept");
+                fileHint.textContent = "";
+            }
         }
 
         form.addEventListener("submit", function (e) {
             const fileType = fileTypeSelect.value;
             
             if (fileType === "text" || fileType === "pdf" || fileType === "code") {
-                const fileInput = document.getElementById("file");
                 if (!fileInput.files || fileInput.files.length === 0) {
                     alert("Please select a file to upload.");
                     e.preventDefault();
@@ -154,7 +189,6 @@
             submitBtn.textContent = "Processing...";
         });
         
-        // Simple typing effect function
         function applyTypingEffect() {
             const resultContent = resultDiv.innerHTML;
             if (!resultContent || resultContent.trim() === '') return;
