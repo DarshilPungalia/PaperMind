@@ -2,7 +2,7 @@ from flask import Flask, request, render_template
 from werkzeug.utils import secure_filename
 import os
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebBaseLoader
-from langchain_community.document_loaders.python import PythonLoader
+from langchain_community.document_loaders.notebook import NotebookLoader
 from langchain_community.document_loaders import TextLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
@@ -66,6 +66,8 @@ SUPPORTED_FILE_TYPES = {
 
     "py": "python",
     "pyw": "python",
+
+    "ipynb": "notebook",
 
     "rst": "rst",
 
@@ -183,20 +185,23 @@ def file_loader(file_type, request):
 
 
     if file_type == 'text':
-        file_path = file_save(request.files.get('file'), 'text')
+        file_path, _ = file_save(request.files.get('file'), 'text')
         loader = TextLoader(file_path)
 
     elif file_type == 'pdf':
-        file_path = file_save(request.files.get('file'), 'pdf')
+        file_path, _ = file_save(request.files.get('file'), 'pdf')
         loader = PyMuPDFLoader(file_path, mode="page", images_inner_format="text", images_parser=RapidOCRBlobParser())
     
     elif file_type == 'code':
         file_path, ext = file_save(request.files.get('file'), 'code')
-        loader = TextLoader(file_path)
-        try:
-            splitter = splitter.from_language(SUPPORTED_FILE_TYPES[ext])
-        except:
-            pass
+        if ext != 'ipynb':
+            loader = TextLoader(file_path)
+            try:
+                splitter = splitter.from_language(SUPPORTED_FILE_TYPES[ext])
+            except:
+                pass
+        else:
+            loader = NotebookLoader(file_path, include_outputs=True, max_output_length=30)
 
     elif file_type == 'link':
         url = request.form.get('url', '').strip()
