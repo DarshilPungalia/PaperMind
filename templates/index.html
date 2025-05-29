@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Paper Mind</title>
+    <!-- Add marked.js for markdown parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.2/marked.min.js"></script>
     <style>
         body {
             background-color: #121212;
@@ -32,13 +34,114 @@
         }
         #result {
             margin-top: 30px;
-            white-space: pre-wrap;
             border: 1px solid #333;
             padding: 15px;
             border-radius: 4px;
             background-color: #1f1f1f;
             min-height: 100px;
+            line-height: 1.6;
         }
+        
+        /* Markdown styling for the result box */
+        #result h1, #result h2, #result h3, #result h4, #result h5, #result h6 {
+            color: #ffffff;
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        
+        #result h1 {
+            font-size: 2em;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+        
+        #result h2 {
+            font-size: 1.5em;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+        
+        #result h3 {
+            font-size: 1.25em;
+        }
+        
+        #result p {
+            margin-bottom: 16px;
+            margin-top: 0;
+        }
+        
+        #result ul, #result ol {
+            margin-bottom: 16px;
+            padding-left: 24px;
+        }
+        
+        #result li {
+            margin-bottom: 4px;
+        }
+        
+        #result blockquote {
+            margin: 0 0 16px 0;
+            padding: 0 16px;
+            border-left: 4px solid #666;
+            color: #ccc;
+            font-style: italic;
+        }
+        
+        #result code {
+            background-color: #2d2d2d;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            color: #ff6b6b;
+        }
+        
+        #result table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+        
+        #result th, #result td {
+            border: 1px solid #333;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        #result th {
+            background-color: #2d2d2d;
+            font-weight: 600;
+        }
+        
+        #result tr:nth-child(even) {
+            background-color: #1a1a1a;
+        }
+        
+        #result a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        
+        #result a:hover {
+            text-decoration: underline;
+        }
+        
+        #result strong {
+            font-weight: 600;
+        }
+        
+        #result em {
+            font-style: italic;
+        }
+        
+        #result hr {
+            border: none;
+            border-top: 1px solid #333;
+            margin: 24px 0;
+        }
+        
         .loader {
             display: none;
             text-align: center;
@@ -93,6 +196,7 @@
         <select name="query" id="query" required>
             <option value="summarise">Summarise</option>
             <option value="faq">Generate FAQs</option>
+            <option value="guide">Study Guide</option>
         </select>
 
         <button type="submit" id="submitBtn">Submit</button>
@@ -112,6 +216,32 @@
         const loader = document.getElementById("loader");
         const submitBtn = document.getElementById("submitBtn");
         const resultDiv = document.getElementById("result");
+
+        // Configure marked.js for better rendering
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // Enhanced markdown detection
+        function isMarkdownContent(content) {
+            if (typeof content !== 'string' || !content.trim()) return false;
+            
+            const markdownIndicators = [
+                /^#{1,6}\s+/m,           // Headers
+                /\*\*.*?\*\*/,           // Bold
+                /\*.*?\*/,               // Italic
+                /^[-*+]\s+/m,            // Unordered lists
+                /^\d+\.\s+/m,            // Ordered lists
+                /`[^`]+`/,               // Inline code
+                /^\>\s+/m,               // Blockquotes
+                /\[.*?\]\(.*?\)/,        // Links
+                /\|.*?\|/,               // Tables
+                /^---+$/m                // Horizontal rules
+            ];
+            
+            return markdownIndicators.some(pattern => pattern.test(content));
+        }
 
         updateInputVisibility(fileTypeSelect.value);
 
@@ -189,22 +319,60 @@
             submitBtn.textContent = "Processing...";
         });
         
+        function renderMarkdown(content) {
+            if (!isMarkdownContent(content)) {
+                return content.replace(/\n/g, '<br>');
+            }
+            
+            return marked.parse(content);
+        }
+        
         function applyTypingEffect() {
             const resultContent = resultDiv.innerHTML;
             if (!resultContent || resultContent.trim() === '') return;
             
-            resultDiv.innerHTML = '';
-            let i = 0;
+            const rawContent = resultDiv.textContent || resultDiv.innerText || '';
             
-            function typeNextChar() {
-                if (i < resultContent.length) {
-                    resultDiv.innerHTML += resultContent.charAt(i);
-                    i++;
-                    setTimeout(typeNextChar, 5);
+            if (rawContent.trim()) {
+                const renderedHtml = renderMarkdown(rawContent);
+                
+                if (renderedHtml !== rawContent) {
+                    resultDiv.innerHTML = '';
+                    let i = 0;
+                    
+                    function typeNextChar() {
+                        if (i < renderedHtml.length) {
+                            resultDiv.innerHTML = renderedHtml.substring(0, i + 1);
+                            i++;
+                            setTimeout(typeNextChar, 5);
+                        }
+                    }
+                    
+                    typeNextChar();
+                } else {
+                    resultDiv.innerHTML = '';
+                    let i = 0;
+                    
+                    function typeNextChar() {
+                        if (i < resultContent.length) {
+                            resultDiv.innerHTML += resultContent.charAt(i);
+                            i++;
+                            setTimeout(typeNextChar, 5);
+                        }
+                    }
+                    
+                    typeNextChar();
                 }
             }
-            
-            typeNextChar();
+        }
+        
+        // Function to manually convert markdown (useful for testing)
+        function convertToMarkdown() {
+            const content = resultDiv.textContent || resultDiv.innerText || '';
+            if (content.trim()) {
+                const markdownHtml = renderMarkdown(content);
+                resultDiv.innerHTML = markdownHtml;
+            }
         }
         
         window.onload = function() {
@@ -218,6 +386,8 @@
                 applyTypingEffect();
             }
         };
+        
+        console.log('To test markdown rendering, call convertToMarkdown() in the console');
     </script>
 </body>
 </html>

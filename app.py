@@ -36,6 +36,11 @@ faq_prompt = PromptTemplate(
     input_variables=['text']
 )
 
+guide_prompt = PromptTemplate(
+    template='Create a study guide which is a condensed and focused resource, include key points, definitions, formulas and quick questions for the given topic.\n {text}',
+    input_variables=['text']
+)
+
 SUPPORTED_FILE_TYPES = {
     "cpp": "cpp",
     "cc": "cpp",
@@ -245,10 +250,12 @@ def index():
 
         summariser_chain = RunnableSequence(summarise_prompt, gemini, parser)
         faq_chain = RunnableSequence(faq_prompt, gemini, parser)
+        guide_chain = RunnableSequence(guide_prompt, gemini, parser)
 
         branch_chain = RunnableBranch(
             (lambda x: x["mode"] == "summarise", summariser_chain),
             (lambda x: x["mode"] == "faq", faq_chain),
+            (lambda x: x['mode'] == 'guide', guide_chain),
             RunnablePassthrough()
         )
 
