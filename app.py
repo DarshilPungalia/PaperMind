@@ -41,6 +41,25 @@ guide_prompt = PromptTemplate(
     input_variables=['text']
 )
 
+timeline_prompt = PromptTemplate(
+    template='''Create a timeline for the the topic. Timeline basically is the chronological order in how things would have happened. 
+    If any time related stuff like date, month or year is mentioned in the text use that as leverage. 
+    For texts that inherently do not have a chronological order try to assume one by breaking it down to fundamental concepts, 
+    reaching a point that seems like a good starting point and just warn the user that it doesn't have a temporal order. 
+    For code just list the hiearchial structure of the classes or order in which the functions are defined.
+    If multiple entries are there for a single year/month club them into a heiarchial points for that year instead of mentioning the year again and again.
+    Don't stray to far away from the source text.\n{text}''',
+    input_variables=['text']
+)
+
+map_prompt = PromptTemplate(
+    template='''Create a mind map for the following topic. A mind map is a heiarchial tree containing topic, its sub-topics which can repeat for N times. 
+    The root is the name of the Topic or file, then comes the major topics discussed in this which then has sub-topics for those. For this division consider only the
+    topics of utmost importance. Each node only mentions the topic name nothing else and if any essential info about that is to be expressed it is done in that topics 
+    sub-tree. For Code break it down using class structures or independent functions.\n{text}''',
+    input_variables=['text']
+)
+
 SUPPORTED_FILE_TYPES = {
     "cpp": "cpp",
     "cc": "cpp",
@@ -251,11 +270,15 @@ def index():
         summariser_chain = RunnableSequence(summarise_prompt, gemini, parser)
         faq_chain = RunnableSequence(faq_prompt, gemini, parser)
         guide_chain = RunnableSequence(guide_prompt, gemini, parser)
+        timeline_chain = RunnableSequence(timeline_prompt, gemini, parser)
+        map_chain = RunnableSequence(map_prompt, gemini, parser)
 
         branch_chain = RunnableBranch(
             (lambda x: x["mode"] == "summarise", summariser_chain),
             (lambda x: x["mode"] == "faq", faq_chain),
             (lambda x: x['mode'] == 'guide', guide_chain),
+            (lambda x: x['mode'] == 'timeline', timeline_chain),
+            (lambda x: x['mode'] == 'map', map_chain),
             RunnablePassthrough()
         )
 
