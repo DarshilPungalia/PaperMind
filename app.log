@@ -1,0 +1,26 @@
+2025-06-03 00:13:45,843-werkzeug-WARNING- * Debugger is active!
+2025-06-03 00:13:45,846-werkzeug-INFO- * Debugger PIN: 806-838-337
+2025-06-03 00:14:00,659-werkzeug-INFO-127.0.0.1 - - [03/Jun/2025 00:14:00] "GET / HTTP/1.1" 200 -
+2025-06-03 00:14:37,966-__main__-INFO-Fetching Query
+2025-06-03 00:14:37,967-__main__-INFO-Fetching Keys
+2025-06-03 00:14:37,968-__main__-INFO-Fetching Files
+2025-06-03 00:14:37,968-__main__-INFO-Fetched file_type_1
+2025-06-03 00:14:37,968-__main__-INFO-Sending file_type_1 to loader
+2025-06-03 00:14:37,968-file_handler-INFO-Loading file type: code for group: 1
+2025-06-03 00:14:37,968-file_handler-INFO-Validating File Type
+2025-06-03 00:14:37,968-file_handler-INFO-Saving file to: uploads\index.html
+2025-06-03 00:14:38,032-file_handler-INFO-Split content into 9 chunks.
+2025-06-03 00:14:38,033-__main__-INFO-Fetched file_type_2
+2025-06-03 00:14:38,033-__main__-INFO-Sending file_type_2 to loader
+2025-06-03 00:14:38,033-file_handler-INFO-Loading file type: code for group: 2
+2025-06-03 00:14:38,033-file_handler-INFO-Validating File Type
+2025-06-03 00:14:38,033-file_handler-INFO-Saving file to: uploads\app.py
+2025-06-03 00:14:38,036-file_handler-INFO-Split content into 2 chunks.
+2025-06-03 00:14:38,036-__main__-INFO-Fetched file_type_3
+2025-06-03 00:14:38,036-__main__-INFO-Sending file_type_3 to loader
+2025-06-03 00:14:38,036-file_handler-INFO-Loading file type: code for group: 3
+2025-06-03 00:14:38,036-file_handler-INFO-Validating File Type
+2025-06-03 00:14:38,036-file_handler-INFO-Saving file to: uploads\file_handler.py
+2025-06-03 00:14:38,038-file_handler-INFO-Split content into 3 chunks.
+2025-06-03 00:14:38,038-__main__-INFO-Chain Invoked
+2025-06-03 00:14:45,489-werkzeug-INFO-127.0.0.1 - - [03/Jun/2025 00:14:45] "POST / HTTP/1.1" 200 -

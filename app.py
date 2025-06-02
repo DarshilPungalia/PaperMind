@@ -1,23 +1,28 @@
 from flask import Flask, request, render_template
-from werkzeug.utils import secure_filename
 import os
-from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebBaseLoader
-from langchain_community.document_loaders.notebook import NotebookLoader
-from langchain_community.document_loaders import TextLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.document_loaders.parsers import RapidOCRBlobParser
 from langchain_core.runnables import RunnableBranch, RunnableSequence, RunnablePassthrough
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
-import validators
+from file_handler import File
+import logging
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, 
+                    filename='app.log', 
+                    filemode='w', 
+                    format="%(asctime)s-%(name)s-%(levelname)s-%(message)s"
+                    )
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+files = File(app)
 
 gemini = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
@@ -27,17 +32,21 @@ gemini = ChatGoogleGenerativeAI(
 parser = StrOutputParser()
 
 summarise_prompt = PromptTemplate(
-    template='Summarise the following text in detail.\n {text}',
+    template='''Summarise the following topic(s).If the source(s) are all for the same topic or contain parts of overarching topic give a detailed summary 
+    covering all the sources. If sources are different topic(s) summarise then in a concise way and cite the name/source of the topic just above its summary.\n {text}''',
     input_variables=['text'],
 )
 
 faq_prompt = PromptTemplate(
-    template='Generate some frequently asked questions for the topic.\n {text}',
+    template='''Generate some frequently asked questions for the following topic(s).If the topic(s) in the sources are completely unrelated create different questionnaires
+    for them and cite the source/topic before listing its questions.\n {text}''',
     input_variables=['text']
 )
 
 guide_prompt = PromptTemplate(
-    template='Create a study guide which is a condensed and focused resource, include key points, definitions, formulas and quick questions for the given topic.\n {text}',
+    template='''Create a study guide which is a condensed and focused resource, include key points, definitions, formulas and quick questions for the given topic(s).
+    If the text contains unrelated topic(s) then also make a single guide only trying to cover all the sources by cutting on content for each source that ain't of utmost
+    importance.\n {text}''',
     input_variables=['text']
 )
 
@@ -48,7 +57,8 @@ timeline_prompt = PromptTemplate(
     reaching a point that seems like a good starting point and just warn the user that it doesn't have a temporal order. 
     For code just list the hiearchial structure of the classes or order in which the functions are defined.
     If multiple entries are there for a single year/month club them into a heiarchial points for that year instead of mentioning the year again and again.
-    Don't stray to far away from the source text.\n{text}''',
+    Don't stray to far away from the source text.For text(s) that are are unrelated create different timelines but with lesser detail. For code Warn the user at top that
+    codes do not have a timeline.\n{text}''',
     input_variables=['text']
 )
 
@@ -56,227 +66,40 @@ map_prompt = PromptTemplate(
     template='''Create a mind map for the following topic. A mind map is a heiarchial tree containing topic, its sub-topics which can repeat for N times. 
     The root is the name of the Topic or file, then comes the major topics discussed in this which then has sub-topics for those. For this division consider only the
     topics of utmost importance. Each node only mentions the topic name nothing else and if any essential info about that is to be expressed it is done in that topics 
-    sub-tree. For Code break it down using class structures or independent functions.\n{text}''',
+    sub-tree. For Code break it down using class structures or independent functions.For source(s) that are unrelated created different mind maps but a shallower tree.
+    For code if related try to segregate it like frontend-backend or according to the code files.\n{text}''',
     input_variables=['text']
 )
-
-SUPPORTED_FILE_TYPES = {
-    "cpp": "cpp",
-    "cc": "cpp",
-    "cxx": "cpp",
-    "hpp": "cpp",
-    "h": "cpp",
-
-    "go": "go",
-
-    "java": "java",
-
-    "kt": "kotlin",
-    "kts": "kotlin",
-
-    "js": "js",
-    "mjs": "js",
-    "cjs": "js",
-
-    "ts": "ts",
-    "tsx": "ts",
-
-    "php": "php",
-    "phtml": "php",
-    "php3": "php",
-    "php4": "php",
-
-    "proto": "proto",
-
-    "py": "python",
-    "pyw": "python",
-
-    "ipynb": "notebook",
-
-    "rst": "rst",
-
-    "rb": "ruby",
-    "erb": "ruby",
-
-    "rs": "rust",
-
-    "scala": "scala",
-    "sc": "scala",
-
-    "swift": "swift",
-
-    "md": "markdown",
-    "markdown": "markdown",
-
-    "tex": "latex",
-    "ltx": "latex",
-    "latex": "latex",
-
-    "html": "html",
-    "htm": "html",
-
-    "sol": "sol",
-
-    "cs": "csharp",
-
-    "cob": "cobol",
-    "cbl": "cobol",
-    "cpy": "cobol",
-
-    "c": "c",
-
-    "lua": "lua",
-
-    "pl": "perl",
-    "pm": "perl",
-    "t": "perl",
-    "pod": "perl",
-
-    "hs": "haskell",
-    "lhs": "haskell",
-
-    "ex": "elixir",
-    "exs": "elixir",
-
-    "ps1": "powershell",
-    "psm1": "powershell",
-    "psd1": "powershell",
-
-    "txt": "text",
-
-    "pdf": "pdf"
-}
-
-def validate_file_type(filename, expected_type):
-    """Validate if the uploaded file matches the expected type"""
-    if not filename:
-        return False, "No filename provided"
-    
-    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
-    
-    if not ext:
-        return False, "File has no extension"
-    
-    if ext not in SUPPORTED_FILE_TYPES:
-        return False, f"Unsupported file extension: .{ext}"
-    
-    if expected_type == 'text' and ext != 'txt':
-        return False, "Please upload a .txt file for Text File type"
-    elif expected_type == 'pdf' and ext != 'pdf':
-        return False, "Please upload a .pdf file for PDF File type"
-    elif expected_type == 'code' and ext in ['txt', 'pdf']:
-        return False, "Please upload a programming file for Code File type"
-    
-    return True, ext
-
-def file_save(file, expected_type):
-    """Save uploaded file with proper validation"""
-    if not file or file.filename == '':
-        return None, "No file selected"
-    
-    is_valid, result = validate_file_type(file.filename, expected_type)
-    if not is_valid:
-        return None, result
-    
-    ext = result
-    secure_name = secure_filename(file.filename)
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_name)
-    
-    try:
-        file.save(file_path)
-        return file_path, ext
-    except Exception as e:
-        return None, f"Failed to save file: {str(e)}"
-
-def validate_url(url):
-    """Validate URL format"""
-    if not url or not url.strip():
-        return False, "URL cannot be empty"
-    
-    url = url.strip()
-    if not url.startswith(('http://', 'https://')):
-        url = 'https://' + url
-    
-    if not validators.url(url):
-        return False, "Invalid URL format"
-    
-    return True, url
-
-def file_loader(file_type, request, group_id):
-    """Load and process different file types"""
-    content = ''
-    splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
-
-
-    if file_type == 'text':
-        file_path, _ = file_save(request.files.get(f'file_{group_id}'), 'text')
-        loader = TextLoader(file_path)
-
-    elif file_type == 'pdf':
-        file_path, _ = file_save(request.files.get(f'file_{group_id}'), 'pdf')
-        loader = PyMuPDFLoader(file_path, mode="page", images_inner_format="text", images_parser=RapidOCRBlobParser())
-    
-    elif file_type == 'code':
-        file_path, ext = file_save(request.files.get(f'file_{group_id}'), 'code')
-        if ext != 'ipynb':
-            loader = TextLoader(file_path)
-            try:
-                splitter = splitter.from_language(SUPPORTED_FILE_TYPES[ext])
-            except:
-                pass
-        else:
-            loader = NotebookLoader(file_path, include_outputs=True, max_output_length=30)
-
-    elif file_type == 'link':
-        url = request.form.get(f'url_{group_id}', '').strip()
-        is_valid, validated_url = validate_url(url)
-        if not is_valid:
-            raise ValueError(validated_url)
-        
-        loader = WebBaseLoader(validated_url)
-
-    elif file_type == 'pasted':
-        content = request.form.get(f'pasted_{group_id}', '').strip()
-        if not content:
-            raise ValueError("No text was pasted")
-
-    try:
-        for page in loader.lazy_load():
-            content += page.page_content + '\n'
-    except Exception as e:
-        raise ValueError(f"Could not load content from file: {str(e)}")
-        
-    if not content.strip():
-        raise ValueError("The file appears to be empty or contains no readable content")
-    
-    chunks = splitter.split_text(content)
-
-    return chunks
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     result = ''
 
     if request.method == 'POST':
+        logger.info('Fetching Query')
         query = request.form.get('query', '').lower().strip()
         text = []
         
         input_groups = set()
+        logger.info('Fetching Keys')
         for key in request.form.keys():
             if key.startswith('file_type_'):
                 group_id = key.split('_')[2]
                 input_groups.add(group_id)
-        
+        logger.info('Fetching Files')
         for group_id in sorted(input_groups):
             file_type = request.form.get(f'file_type_{group_id}')
+            logger.info(f'Fetched file_type_{group_id}')
             if file_type:
                 try:
-                    content = file_loader(file_type, request, group_id)
+                    logger.info(f'Sending file_type_{group_id} to loader')
+                    content = files.file_loader(file_type, request, group_id)
                     text.extend(content)
                 except Exception as e:
-                    print(f"Error processing input {group_id}: {e}")
+                    logger.exception(f"Error processing input {group_id}")
 
         if len(text)==0:
+            logger.error()
             raise ValueError("No content available for processing")
 
         input_data = {"mode": query, "text": text}
@@ -296,6 +119,7 @@ def index():
             RunnablePassthrough()
         )
 
+        logger.info('Chain Invoked')
         result = branch_chain.invoke(input_data)
 
     return render_template('index.html', result=result)
