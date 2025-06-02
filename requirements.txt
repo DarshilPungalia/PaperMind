@@ -1,0 +1,7 @@
+flask
+langchain
+langchain_google_genai
+dotenv
+langchain_community
+langchain_core
+validators
