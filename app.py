@@ -202,22 +202,22 @@ def validate_url(url):
     
     return True, url
 
-def file_loader(file_type, request):
+def file_loader(file_type, request, group_id):
     """Load and process different file types"""
     content = ''
     splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
 
 
     if file_type == 'text':
-        file_path, _ = file_save(request.files.get('file'), 'text')
+        file_path, _ = file_save(request.files.get(f'file_{group_id}'), 'text')
         loader = TextLoader(file_path)
 
     elif file_type == 'pdf':
-        file_path, _ = file_save(request.files.get('file'), 'pdf')
+        file_path, _ = file_save(request.files.get(f'file_{group_id}'), 'pdf')
         loader = PyMuPDFLoader(file_path, mode="page", images_inner_format="text", images_parser=RapidOCRBlobParser())
     
     elif file_type == 'code':
-        file_path, ext = file_save(request.files.get('file'), 'code')
+        file_path, ext = file_save(request.files.get(f'file_{group_id}'), 'code')
         if ext != 'ipynb':
             loader = TextLoader(file_path)
             try:
@@ -228,7 +228,7 @@ def file_loader(file_type, request):
             loader = NotebookLoader(file_path, include_outputs=True, max_output_length=30)
 
     elif file_type == 'link':
-        url = request.form.get('url', '').strip()
+        url = request.form.get(f'url_{group_id}', '').strip()
         is_valid, validated_url = validate_url(url)
         if not is_valid:
             raise ValueError(validated_url)
@@ -236,7 +236,7 @@ def file_loader(file_type, request):
         loader = WebBaseLoader(validated_url)
 
     elif file_type == 'pasted':
-        content = request.form.get('pasted', '').strip()
+        content = request.form.get(f'pasted_{group_id}', '').strip()
         if not content:
             raise ValueError("No text was pasted")
 
@@ -258,9 +258,23 @@ def index():
     result = ''
 
     if request.method == 'POST':
-        file_type = request.form.get('file_type', '').lower().strip()
         query = request.form.get('query', '').lower().strip()
-        text = file_loader(file_type, request)
+        text = []
+        
+        input_groups = set()
+        for key in request.form.keys():
+            if key.startswith('file_type_'):
+                group_id = key.split('_')[2]
+                input_groups.add(group_id)
+        
+        for group_id in sorted(input_groups):
+            file_type = request.form.get(f'file_type_{group_id}')
+            if file_type:
+                try:
+                    content = file_loader(file_type, request, group_id)
+                    text.extend(content)
+                except Exception as e:
+                    print(f"Error processing input {group_id}: {e}")
 
         if len(text)==0:
             raise ValueError("No content available for processing")

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Paper Mind</title>
+    <title>Paper Mind - Multiple Inputs</title>
     <!-- Add marked.js for markdown parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.2/marked.min.js"></script>
     <style>
@@ -31,6 +31,43 @@
         }
         button:hover {
             background-color: #444;
+        }
+        button.add-input {
+            background-color: #0066cc;
+            width: auto;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        button.add-input:hover {
+            background-color: #0080ff;
+        }
+        button.remove-input {
+            background-color: #cc0000;
+            width: auto;
+            display: inline-block;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        button.remove-input:hover {
+            background-color: #ff0000;
+        }
+        .input-group {
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #1a1a1a;
+            position: relative;
+        }
+        .input-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .input-group-title {
+            font-weight: bold;
+            color: #0080ff;
         }
         #result {
             margin-top: 30px;
@@ -157,67 +194,58 @@
             40% { content: "Processing.."; }
             60%, 100% { content: "Processing..."; }
         }
-        /* Simple cursor style for typing effect */
-        @keyframes blink {
-            0%, 49% { opacity: 1; }
-            50%, 100% { opacity: 0; }
+        
+        .input-summary {
+            background-color: #2a2a2a;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        
+        .input-count {
+            color: #0080ff;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <h1>Paper Mind</h1>
+    <h1>Paper Mind - Multiple Inputs</h1>
+    
+    <div class="input-summary" id="inputSummary">
+        <span class="input-count">1</span> input source(s) configured
+    </div>
+    
     <form id="docForm" action="/" method="POST" enctype="multipart/form-data">
-        <label for="file_type">File Type:</label>
-        <select name="file_type" id="file_type" required>
-            <option value="text">Text File</option>
-            <option value="pdf">PDF File</option>
-            <option value="code">Code File</option>
-            <option value="link">Web URL</option>
-            <option value="pasted">Pasted Text</option>
-        </select>
-
-        <div id="file_input_container">
-            <label for="file">Upload File:</label>
-            <input type="file" name="file" id="file">
-            <small id="fileHint" style="color: #bbb;"></small>
+        <div id="inputContainer">
+            <!-- Initial input group will be added by JavaScript -->
         </div>
-
-        <div id="url_input_container" style="display: none;">
-            <label for="url">Enter URL:</label>
-            <input type="text" name="url" id="url">
-        </div>
-
-        <div id="paste_input_container" style="display: none;">
-            <label for="pasted">Paste Text:</label>
-            <textarea name="pasted" id="pasted" rows="8"></textarea>
-        </div>
-
+        
+        <button type="button" class="add-input" onclick="addInputGroup()">+ Add Another Input</button>
+        
         <label for="query">Task:</label>
         <select name="query" id="query" required>
-            <option value="summarise">Summarise</option>
+            <option value="summarise">Summarise All</option>
             <option value="faq">Generate FAQs</option>
             <option value="guide">Study Guide</option>
             <option value="timeline">Timeline</option>
             <option value="map">Mind Map</option>
+            <option value="compare">Compare Sources</option>
         </select>
 
-        <button type="submit" id="submitBtn">Submit</button>
+        <button type="submit" id="submitBtn">Process All Inputs</button>
     </form>
     
     <div class="loader" id="loader"></div>
     <div id="result">{{ result|safe }}</div>
 
     <script>
-        const fileTypeSelect = document.getElementById("file_type");
-        const fileInputContainer = document.getElementById("file_input_container");
-        const urlInputContainer = document.getElementById("url_input_container");
-        const pasteInputContainer = document.getElementById("paste_input_container");
-        const fileHint = document.getElementById("fileHint");
-        const fileInput = document.getElementById("file");
+        let inputCounter = 0;
         const form = document.getElementById("docForm");
         const loader = document.getElementById("loader");
         const submitBtn = document.getElementById("submitBtn");
         const resultDiv = document.getElementById("result");
+        const inputSummary = document.getElementById("inputSummary");
 
         // Configure marked.js for better rendering
         marked.setOptions({
@@ -245,13 +273,74 @@
             return markdownIndicators.some(pattern => pattern.test(content));
         }
 
-        updateInputVisibility(fileTypeSelect.value);
+        function addInputGroup() {
+            inputCounter++;
+            const container = document.getElementById("inputContainer");
+            
+            const inputGroup = document.createElement("div");
+            inputGroup.className = "input-group";
+            inputGroup.id = `input-group-${inputCounter}`;
+            
+            inputGroup.innerHTML = `
+                <div class="input-group-header">
+                    <span class="input-group-title">Input Source ${inputCounter}</span>
+                    ${inputCounter > 1 ? `<button type="button" class="remove-input" onclick="removeInputGroup(${inputCounter})">Remove</button>` : ''}
+                </div>
+                
+                <label for="file_type_${inputCounter}">File Type:</label>
+                <select name="file_type_${inputCounter}" id="file_type_${inputCounter}" required>
+                    <option value="text">Text File</option>
+                    <option value="pdf">PDF File</option>
+                    <option value="code">Code File</option>
+                    <option value="link">Web URL</option>
+                    <option value="pasted">Pasted Text</option>
+                </select>
 
-        fileTypeSelect.addEventListener("change", function () {
-            updateInputVisibility(fileTypeSelect.value);
-        });
+                <div id="file_input_container_${inputCounter}">
+                    <label for="file_${inputCounter}">Upload File:</label>
+                    <input type="file" name="file_${inputCounter}" id="file_${inputCounter}">
+                    <small id="fileHint_${inputCounter}" style="color: #bbb;"></small>
+                </div>
 
-        function updateInputVisibility(fileType) {
+                <div id="url_input_container_${inputCounter}" style="display: none;">
+                    <label for="url_${inputCounter}">Enter URL:</label>
+                    <input type="text" name="url_${inputCounter}" id="url_${inputCounter}">
+                </div>
+
+                <div id="paste_input_container_${inputCounter}" style="display: none;">
+                    <label for="pasted_${inputCounter}">Paste Text:</label>
+                    <textarea name="pasted_${inputCounter}" id="pasted_${inputCounter}" rows="8"></textarea>
+                </div>
+            `;
+            
+            container.appendChild(inputGroup);
+            
+            // Add event listener for the new file type select
+            const fileTypeSelect = document.getElementById(`file_type_${inputCounter}`);
+            fileTypeSelect.addEventListener("change", function() {
+                updateInputVisibility(inputCounter, this.value);
+            });
+            
+            // Initialize visibility
+            updateInputVisibility(inputCounter, "text");
+            updateInputSummary();
+        }
+
+        function removeInputGroup(id) {
+            const inputGroup = document.getElementById(`input-group-${id}`);
+            if (inputGroup) {
+                inputGroup.remove();
+                updateInputSummary();
+            }
+        }
+
+        function updateInputVisibility(id, fileType) {
+            const fileInputContainer = document.getElementById(`file_input_container_${id}`);
+            const urlInputContainer = document.getElementById(`url_input_container_${id}`);
+            const pasteInputContainer = document.getElementById(`paste_input_container_${id}`);
+            const fileHint = document.getElementById(`fileHint_${id}`);
+            const fileInput = document.getElementById(`file_${id}`);
+
             fileInputContainer.style.display = fileType === "text" || fileType === "pdf" || fileType === "code" ? "block" : "none";
             urlInputContainer.style.display = fileType === "link" ? "block" : "none";
             pasteInputContainer.style.display = fileType === "pasted" ? "block" : "none";
@@ -291,34 +380,50 @@
             }
         }
 
+        function updateInputSummary() {
+            const inputGroups = document.querySelectorAll('.input-group');
+            const count = inputGroups.length;
+            inputSummary.innerHTML = `<span class="input-count">${count}</span> input source(s) configured`;
+        }
+
         form.addEventListener("submit", function (e) {
-            const fileType = fileTypeSelect.value;
+            const inputGroups = document.querySelectorAll('.input-group');
+            let hasValidInput = false;
             
-            if (fileType === "text" || fileType === "pdf" || fileType === "code") {
-                if (!fileInput.files || fileInput.files.length === 0) {
-                    alert("Please select a file to upload.");
-                    e.preventDefault();
-                    return false;
+            // Validate each input group
+            for (let i = 0; i < inputGroups.length; i++) {
+                const inputGroup = inputGroups[i];
+                const groupId = inputGroup.id.split('-')[2];
+                const fileTypeSelect = inputGroup.querySelector(`select[name="file_type_${groupId}"]`);
+                const fileType = fileTypeSelect.value;
+                
+                if (fileType === "text" || fileType === "pdf" || fileType === "code") {
+                    const fileInput = inputGroup.querySelector(`input[name="file_${groupId}"]`);
+                    if (fileInput.files && fileInput.files.length > 0) {
+                        hasValidInput = true;
+                    }
+                } else if (fileType === "link") {
+                    const urlInput = inputGroup.querySelector(`input[name="url_${groupId}"]`);
+                    if (urlInput.value.trim()) {
+                        hasValidInput = true;
+                    }
+                } else if (fileType === "pasted") {
+                    const pastedInput = inputGroup.querySelector(`textarea[name="pasted_${groupId}"]`);
+                    if (pastedInput.value.trim()) {
+                        hasValidInput = true;
+                    }
                 }
-            } else if (fileType === "link") {
-                const urlInput = document.getElementById("url");
-                if (!urlInput.value.trim()) {
-                    alert("Please enter a URL.");
-                    e.preventDefault();
-                    return false;
-                }
-            } else if (fileType === "pasted") {
-                const pastedInput = document.getElementById("pasted");
-                if (!pastedInput.value.trim()) {
-                    alert("Please paste some text.");
-                    e.preventDefault();
-                    return false;
-                }
+            }
+            
+            if (!hasValidInput) {
+                alert("Please provide at least one valid input source.");
+                e.preventDefault();
+                return false;
             }
             
             loader.style.display = "block";
             submitBtn.disabled = true;
-            submitBtn.textContent = "Processing...";
+            submitBtn.textContent = "Processing";
         });
         
         function renderMarkdown(content) {
@@ -377,12 +482,9 @@
             }
         }
         
+        // Initialize with first input group
         window.onload = function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const fileType = urlParams.get('file_type') || "text"; 
-            
-            fileTypeSelect.value = fileType;
-            updateInputVisibility(fileType);
+            addInputGroup();
             
             if (resultDiv.innerHTML && resultDiv.innerHTML.trim() !== '') {
                 applyTypingEffect();
