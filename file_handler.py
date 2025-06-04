@@ -1,4 +1,5 @@
 import os
+from flask import Flask
 from werkzeug.utils import secure_filename
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebBaseLoader
 from langchain_community.document_loaders.notebook import NotebookLoader
@@ -99,7 +100,10 @@ class File():
 
         "pdf": "pdf"
     }
-        self.app = app
+        if isinstance(app, Flask):
+            self.app = app
+        else:
+            raise TypeError(f"app type {type(app)} is invalid. app must be Flask type") 
 
     def validate_file_type(self, filename, expected_type):
         """Validate if the uploaded file matches the expected type"""
