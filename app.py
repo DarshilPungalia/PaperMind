@@ -24,10 +24,15 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 files = File(app)
 
-gemini = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    temperature=0.5
-)
+try:
+    logger.info('Initializing Gemini')
+    gemini = ChatGoogleGenerativeAI(
+        model="gemini-2.0-flash",
+        temperature=0.5
+    )
+
+except Exception:
+    logger.critical("Gemini Couldn't be initialized", exc_info=True, stack_info=True)
 
 parser = StrOutputParser()
 

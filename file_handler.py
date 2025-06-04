@@ -103,6 +103,7 @@ class File():
         if isinstance(app, Flask):
             self.app = app
         else:
+            logger.error('Unsupported app type')
             raise TypeError(f"app type {type(app)} is invalid. app must be Flask type") 
 
     def validate_file_type(self, filename, expected_type):
