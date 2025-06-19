@@ -5,9 +5,11 @@ from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebB
 from langchain_community.document_loaders.notebook import NotebookLoader
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.parsers import RapidOCRBlobParser
+from langchain_community.document_loaders.youtube import YoutubeLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import validators
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +105,6 @@ class File():
         if isinstance(app, Flask):
             self.app = app
         else:
-            logger.error('Unsupported app type')
             raise TypeError(f"app type {type(app)} is invalid. app must be Flask type") 
 
     def validate_file_type(self, filename, expected_type):
@@ -153,7 +154,7 @@ class File():
             return None, f"Failed to save file: {str(e)}"
 
     @staticmethod
-    def validate_url(url):
+    def validate_url(url: str):
         logger.debug(f"Validating URL: {url}")
         if not url or not url.strip():
             return False, "URL cannot be empty"
@@ -165,9 +166,28 @@ class File():
         if not validators.url(url):
             logger.error("Invalid URL format.")
             return False, "Invalid URL format"
-        
+                
         logger.debug(f"URL validated: {url}")
         return True, url
+    
+    @staticmethod
+    def check_yt(url: str):
+        logger.info('Checking for youtube link.')
+        is_yt = bool(re.search(r"(www\.youtube\.com/watch)", url, re.IGNORECASE))
+        video_id = None
+
+        if is_yt:
+            logger.info("Extracting Video ID")
+            pattern = r"(?:v=|\/)([0-9A-Za-z_-]{11})"
+            match = re.search(pattern, url)
+            if match:
+                video_id = match.group(1)
+            else:
+                logger.exception("Provided link doesn't have a Video ID")
+                raise ValueError(f"Provided url '{url}' is a YouTube link but no valid video ID was found.")
+
+        return is_yt, video_id
+
 
     def file_loader(self, file_type, request, group_id):
         logger.info(f"Loading file type: {file_type} for group: {group_id}")
@@ -198,9 +218,11 @@ class File():
             elif file_type == 'link':
                 url = request.form.get(f'url_{group_id}', '').strip()
                 is_valid, validated_url = self.validate_url(url)
+                is_yt, video_id = self.check_yt(validated_url)
                 if not is_valid:
                     raise ValueError(validated_url)
-                loader = WebBaseLoader(validated_url)
+                
+                loader = YoutubeLoader(video_id).from_youtube_url(validated_url) if is_yt else WebBaseLoader(validated_url)
 
             elif file_type == 'pasted':
                 content = request.form.get(f'pasted_{group_id}', '').strip()
@@ -213,12 +235,12 @@ class File():
                     content += page.page_content + '\n'
 
         except Exception as e:
-            logger.exception(f"Could not load content from file: {str(e)}")
-            raise ValueError(f"Could not load content from file: {str(e)}")
+            logger.exception(f"Could not load content from the source(s): {str(e)}")
+            raise ValueError(f"Could not load content from the source(s): {str(e)}")
             
         if not content.strip():
-            logger.error("Empty or unreadable content in uploaded file.")
-            raise ValueError("The file appears to be empty or contains no readable content")
+            logger.error("Empty or unreadable content in uploaded source(s).")
+            raise ValueError("The source(s) appears to be empty or contains no readable content")
         
         chunks = splitter.split_text(content)
         logger.info(f"Split content into {len(chunks)} chunks.")
