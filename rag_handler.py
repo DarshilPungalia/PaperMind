@@ -8,7 +8,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_core.messages import HumanMessage, AIMessage
 import logging
-from typing import List
+from typing import List, Union, Dict
 from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from flask.sessions import SessionMixin
@@ -90,6 +90,8 @@ class VectorStore:
         except Exception as e:
             raise VectorStoreError(f'Unable to create Retriever from Vector Store: {e}')
 
+_vector_store = VectorStore(persist_directory=None)
+
 class DocumentQAError(Exception):
     """Base exception for DocumentQA errors"""
     pass
@@ -112,9 +114,9 @@ class SessionError(DocumentQAError):
 class ChatHistory:
     """Manages chat history using Flask session"""
     
-    def __init__(self, session: SessionMixin):
+    def __init__(self, session: Union[SessionMixin, Dict]):
         try:
-            if not isinstance(session, SessionMixin):
+            if not isinstance(session, SessionMixin) and not isinstance(session, dict):
                 raise TypeError("Expected a Flask SessionMixin object")
             self.session = session
         except Exception as e:
@@ -152,10 +154,11 @@ class ChatHistory:
 
 class DocumentQA():
     """A complete document-based question-answering system with RAG capabilities"""
-    def __init__(self, session: SessionMixin):        
+    def __init__(self, session: SessionMixin, vector_store: VectorStore=None):        
         try:
             self.chat_history = ChatHistory(session)
-            self.retriever = VectorStore().get_retriever()
+            self.vector_store = vector_store or _vector_store
+            self.retriever = self.vector_store.get_retriever()
             self.chain = self.build_chain()
             
             logger.info("DocumentQA initialized successfully")
@@ -248,7 +251,7 @@ class DocumentQA():
     def get_vectorstore(self) -> Chroma:
         """Get the underlying vector store"""
         logger.info('Fetching Vector Store')
-        return self.vectorstore
+        return self.vector_store
 
         
     def get_retriever(self) -> VectorStoreRetriever:
