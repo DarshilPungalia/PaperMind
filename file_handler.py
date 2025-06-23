@@ -192,7 +192,7 @@ class File():
     def file_loader(self, file_type, request, group_id):
         logger.info(f"Loading file type: {file_type} for group: {group_id}")
         content = ''
-        splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=256, separators=['\n\n', '\n', '.', '?', '!', ' ', ''])
 
         try:
             if file_type == 'text':
@@ -231,16 +231,15 @@ class File():
                 logger.debug("Pasted content received.")
 
             if file_type != 'pasted':
-                for page in loader.lazy_load():
-                    content += page.page_content + '\n'
+                content += loader.load()[0].page_content
 
         except Exception as e:
-            logger.exception(f"Could not load content from the source(s): {str(e)}")
-            raise ValueError(f"Could not load content from the source(s): {str(e)}")
+            logger.exception(f"Could not load content: {str(e)}")
+            raise ValueError(f"Could not load content: {str(e)}")
             
         if not content.strip():
-            logger.error("Empty or unreadable content in uploaded source(s).")
-            raise ValueError("The source(s) appears to be empty or contains no readable content")
+            logger.error("Empty or unreadable content in uploaded source.")
+            raise ValueError("The source appears to be empty or contains no readable content")
         
         chunks = splitter.split_text(content)
         logger.info(f"Split content into {len(chunks)} chunks.")

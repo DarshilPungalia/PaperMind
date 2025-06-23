@@ -8,7 +8,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_core.messages import HumanMessage, AIMessage
 import logging
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Literal
 from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from flask.sessions import SessionMixin
@@ -75,7 +75,7 @@ class VectorStore:
             raise VectorStoreError(f'Unable to insert documents: {e}')
         
 
-    def get_retriever(self)->VectorStoreRetriever:
+    def get_retriever(self, search_type:Literal["similarity", "mmr", "similarity_score_threshold"]="similarity")->VectorStoreRetriever:
         """
         Get a retriever from the current vectorstore.
         """
@@ -83,7 +83,7 @@ class VectorStore:
             if self._vectorstore is None:
                 raise RuntimeError("Vectorstore not initialized.")
             if self._retriever is None:
-                self._retriever = self._vectorstore.as_retriever()
+                self._retriever = self._vectorstore.as_retriever(search_type=search_type)
                 logger.info("Retriever created from vectorstore.")
             return self._retriever
         
@@ -131,9 +131,9 @@ class ChatHistory:
 
             next_index = len(history)
 
-            messenger, role = (HumanMessage,'Human') if next_index%2==0 else (AIMessage,'LLM')
+            role = 'Human' if next_index%2==0 else 'LLM'
 
-            history.append(messenger(content=message))
+            history.append({'role': role, 'content': message})
             logger.debug(f"Added {role} message to chat history. Total messages: {len(history)}")
 
 
@@ -147,6 +147,24 @@ class ChatHistory:
         """Get the complete chat history"""
         return self.session.get('chat_history', [])
     
+    def format_history_for_chain(self) ->List[Union[HumanMessage, AIMessage]]:
+        history = self.get_history()
+        formatted_history = []
+
+        for message in history:
+            role = message.get('role', '')
+            content = message.get('content', '')
+            
+            if role == 'Human':
+                formatted_history.append(HumanMessage(content=content))
+            elif role == 'LLM':  
+                formatted_history.append(AIMessage(content=content))
+            else:
+                logger.warning(f"Unexpected role in chat history: {role}")
+                formatted_history.append(AIMessage(content=content))
+        
+        return formatted_history
+    
     def clear_history(self):
         """Clear the chat history"""
         self.session['chat_history'] = []
@@ -158,7 +176,7 @@ class DocumentQA():
         try:
             self.chat_history = ChatHistory(session)
             self.vector_store = vector_store or _vector_store
-            self.retriever = self.vector_store.get_retriever()
+            self.retriever = self.vector_store.get_retriever(search_type='mmr')
             self.chain = self.build_chain()
             
             logger.info("DocumentQA initialized successfully")
@@ -195,7 +213,8 @@ class DocumentQA():
 
         prompt = PromptTemplate(
             template='''Your name is PaperMind. Answer the user query with the help of the document provided.Ignore parts present in context which are irrelevant to the query. For document 
-            specific questions which can be personal info, company info, etc stick to it, if the questions seems more general add your input too it.
+            specific questions which can be personal info, company info, etc stick to it. If the document doesn't contain any info regarding query and if you are capable of CORRECTLY 
+            answering it, do so by WARNING the user clearly that the document didn't have the given info but you think the answer is this. But for the most part try to STICK TO THE DOCUMENT only.
             document:{document}
 
             Use this chat history to have a context of the chat.
@@ -209,7 +228,7 @@ class DocumentQA():
             input_chain = RunnableParallel({
                 'document': self.retriever | RunnableLambda(self.combine_context),
                 'query': RunnablePassthrough(),
-                'chat_history':RunnableLambda(self.get_chat_history)
+                'chat_history':RunnableLambda(lambda _ :self.chat_history.format_history_for_chain)
             })
 
             logger.info('Building QnA chain')
@@ -251,7 +270,7 @@ class DocumentQA():
     def get_vectorstore(self) -> Chroma:
         """Get the underlying vector store"""
         logger.info('Fetching Vector Store')
-        return self.vector_store
+        return _vector_store
 
         
     def get_retriever(self) -> VectorStoreRetriever:
@@ -260,13 +279,11 @@ class DocumentQA():
         return self.retriever
 
     
-    def get_chat_history(self, formatted:bool = False) -> List:
+    def get_chat_history(self) -> List:
         """Get the chat history"""
         try:
             logger.info('Fetching Chat history from the session')
             history = self.chat_history.get_history()
-            if formatted:
-                return [role.content for role in history]
             return history
         except Exception as e:
             raise SessionError(f'Can not fetch chat history: {e}')
