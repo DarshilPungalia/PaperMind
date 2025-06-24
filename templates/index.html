@@ -207,19 +207,71 @@
             color: #0080ff;
             font-weight: bold;
         }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .nav-links a {
+            color: #0080ff;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            transition: background-color 0.3s;
+        }
+
+        .nav-links a:hover {
+            background-color: #333;
+        }
+
+        .nav-links a.active {
+            background-color: #0080ff;
+            color: white;
+        }
+
+        .upload-status {
+            display: none;
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .upload-status.success {
+            border-color: #00cc00;
+            color: #00cc00;
+        }
+
+        .upload-status.error {
+            border-color: #cc0000;
+            color: #cc0000;
+        }
+
+        .upload-status.loading {
+            border-color: #0080ff;
+            color: #0080ff;
+        }
     </style>
 </head>
 <body>
-    <h1>Paper Mind - Multiple Inputs</h1>
+    <h1>Paper Mind</h1>
+    <div class="nav-links">
+    <a href="/">Process Documents</a>
+    <a href="/chat">Chat</a>
+    </div>
     
     <div class="input-summary" id="inputSummary">
         <span class="input-count">1</span> input source(s) configured
     </div>
     
     <form id="docForm" action="/" method="POST" enctype="multipart/form-data">
-        <div id="inputContainer">
-            <!-- Initial input group will be added by JavaScript -->
-        </div>
+        <div id="inputContainer"></div>
         
         <button type="button" class="add-input" onclick="addInputGroup()">+ Add Another Input</button>
         
@@ -241,11 +293,12 @@
 
     <script>
         let inputCounter = 0;
-        const form = document.getElementById("docForm");
+        let isUploading = false;
+        const inputSummary = document.getElementById("inputSummary");
+        const docForm = document.getElementById("docForm");
         const loader = document.getElementById("loader");
         const submitBtn = document.getElementById("submitBtn");
         const resultDiv = document.getElementById("result");
-        const inputSummary = document.getElementById("inputSummary");
 
         // Configure marked.js for better rendering
         marked.setOptions({
@@ -331,6 +384,8 @@
             if (inputGroup) {
                 inputGroup.remove();
                 updateInputSummary();
+                // Trigger auto-upload after removal
+                debounceAutoUpload();
             }
         }
 
@@ -386,7 +441,130 @@
             inputSummary.innerHTML = `<span class="input-count">${count}</span> input source(s) configured`;
         }
 
-        form.addEventListener("submit", function (e) {
+        // Add upload status functionality
+        function showUploadStatus(message, type = 'loading') {
+            const statusDiv = document.getElementById('uploadStatus') || createUploadStatus();
+            statusDiv.textContent = message;
+            statusDiv.className = `upload-status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function createUploadStatus() {
+            const statusDiv = document.createElement('div');
+            statusDiv.id = 'uploadStatus';
+            statusDiv.className = 'upload-status';
+            document.querySelector('.input-summary').after(statusDiv);
+            return statusDiv;
+        }
+
+        // Debounce function to prevent too many rapid uploads
+        let uploadTimeout;
+        function debounceAutoUpload() {
+            clearTimeout(uploadTimeout);
+            uploadTimeout = setTimeout(autoUpload, 500); // Wait 500ms after last change
+        }
+
+        // Auto-upload function that sends data to /upload endpoint
+        async function autoUpload() {
+            if (isUploading) return;
+            
+            const inputGroups = document.querySelectorAll('.input-group');
+            let hasValidInput = false;
+            
+            // Check if there's any valid input
+            for (let group of inputGroups) {
+                const groupId = group.id.split('-')[2];
+                const fileType = group.querySelector(`select[name="file_type_${groupId}"]`).value;
+                
+                if (fileType === "text" || fileType === "pdf" || fileType === "code") {
+                    const fileInput = group.querySelector(`input[name="file_${groupId}"]`);
+                    if (fileInput.files && fileInput.files.length > 0) {
+                        hasValidInput = true;
+                        break;
+                    }
+                } else if (fileType === "link") {
+                    const urlInput = group.querySelector(`input[name="url_${groupId}"]`);
+                    if (urlInput.value.trim()) {
+                        hasValidInput = true;
+                        break;
+                    }
+                } else if (fileType === "pasted") {
+                    const pastedInput = group.querySelector(`textarea[name="pasted_${groupId}"]`);
+                    if (pastedInput.value.trim()) {
+                        hasValidInput = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!hasValidInput) return;
+            
+            isUploading = true;
+            showUploadStatus('Uploading and indexing documents...', 'loading');
+            
+            try {
+                const formData = new FormData();
+                
+                // Add all input data to form
+                inputGroups.forEach(group => {
+                    const groupId = group.id.split('-')[2];
+                    const fileType = group.querySelector(`select[name="file_type_${groupId}"]`).value;
+                    
+                    formData.append(`file_type_${groupId}`, fileType);
+                    
+                    if (fileType === "text" || fileType === "pdf" || fileType === "code") {
+                        const fileInput = group.querySelector(`input[name="file_${groupId}"]`);
+                        if (fileInput.files && fileInput.files.length > 0) {
+                            formData.append(`file_${groupId}`, fileInput.files[0]);
+                        }
+                    } else if (fileType === "link") {
+                        const urlInput = group.querySelector(`input[name="url_${groupId}"]`);
+                        formData.append(`url_${groupId}`, urlInput.value);
+                    } else if (fileType === "pasted") {
+                        const pastedInput = group.querySelector(`textarea[name="pasted_${groupId}"]`);
+                        formData.append(`pasted_${groupId}`, pastedInput.value);
+                    }
+                });
+                
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const message = await response.text();
+                    showUploadStatus(message, 'success');
+                } else {
+                    const errorText = await response.text();
+                    showUploadStatus(`Upload failed: ${errorText}`, 'error');
+                    console.error('Upload failed:', errorText);
+                }
+                
+            } catch (error) {
+                showUploadStatus(`Upload error: ${error.message}`, 'error');
+                console.error('Upload error:', error);
+            } finally {
+                isUploading = false;
+            }
+        }
+
+
+        // Add event listeners for auto-upload
+        document.addEventListener("change", function(e) {
+            const el = e.target;
+            if (el.matches("input[type='file'], input[type='text'], textarea")) {
+                debounceAutoUpload();
+            }
+        });
+
+        // Handle main form submission
+        docForm.addEventListener("submit", function (e) {
             const inputGroups = document.querySelectorAll('.input-group');
             let hasValidInput = false;
             
@@ -423,7 +601,7 @@
             
             loader.style.display = "block";
             submitBtn.disabled = true;
-            submitBtn.textContent = "Processing";
+            submitBtn.textContent = "Processing...";
         });
         
         function renderMarkdown(content) {
@@ -485,6 +663,15 @@
         // Initialize with first input group
         window.onload = function() {
             addInputGroup();
+
+            // Set active navigation
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.nav-links a');
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
             
             if (resultDiv.innerHTML && resultDiv.innerHTML.trim() !== '') {
                 applyTypingEffect();

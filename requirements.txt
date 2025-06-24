@@ -6,3 +6,4 @@ langchain_core
 langchain_chroma
 validators
 dotenv
+chromadb

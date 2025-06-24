@@ -12,6 +12,7 @@ from typing import List, Union, Dict, Literal
 from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from flask.sessions import SessionMixin
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -65,8 +66,10 @@ class VectorStore:
             if self._vectorstore is None:
                 raise RuntimeError("Vectorstore not initialized. Call init_vectorstore() first.")
             try:
+                start = time.perf_counter()
                 self._vectorstore.add_texts(documents)
-                logger.info(f"Successfully added {len(documents)} documents to vector store")
+                end = time.perf_counter()
+                logger.info(f"Successfully added {len(documents)} documents to vector store in {end-start} seconds")
             except Exception as e:
                 logger.error(f"Failed to add documents to vector store: {e}")
                 raise VectorStoreError(f"Failed to add documents: {e}")
@@ -131,7 +134,7 @@ class ChatHistory:
 
             next_index = len(history)
 
-            role = 'Human' if next_index%2==0 else 'LLM'
+            role = 'user' if next_index%2==0 else 'assistant'
 
             history.append({'role': role, 'content': message})
             logger.debug(f"Added {role} message to chat history. Total messages: {len(history)}")
@@ -252,8 +255,10 @@ class DocumentQA():
         self.chat_history.add_message(user_query)
         
         try:
+            start = time.perf_counter()
             response = self.chain.invoke(user_query)
-                
+            end = time.perf_counter()
+
         except Exception as e:
             logger.error(f"Chain execution failed: {e}")
             raise DocumentQAError(f"Failed to process query: {e}")
@@ -264,7 +269,7 @@ class DocumentQA():
         logger.info('Updating session Chat history with LLM response')
         self.chat_history.add_message(response)
         
-        logger.info(f"Query processed successfully, response length: {len(response)}")
+        logger.info(f"Query processed successfully, response length: {len(response)} and response time: {end-start}")
         return response
     
     def get_vectorstore(self) -> Chroma:
