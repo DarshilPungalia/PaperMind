@@ -1,26 +1,43 @@
-2025-06-03 00:13:45,843-werkzeug-WARNING- * Debugger is active!
-2025-06-03 00:13:45,846-werkzeug-INFO- * Debugger PIN: 806-838-337
-2025-06-03 00:14:00,659-werkzeug-INFO-127.0.0.1 - - [03/Jun/2025 00:14:00] "GET / HTTP/1.1" 200 -
-2025-06-03 00:14:37,966-__main__-INFO-Fetching Query
-2025-06-03 00:14:37,967-__main__-INFO-Fetching Keys
-2025-06-03 00:14:37,968-__main__-INFO-Fetching Files
-2025-06-03 00:14:37,968-__main__-INFO-Fetched file_type_1
-2025-06-03 00:14:37,968-__main__-INFO-Sending file_type_1 to loader
-2025-06-03 00:14:37,968-file_handler-INFO-Loading file type: code for group: 1
-2025-06-03 00:14:37,968-file_handler-INFO-Validating File Type
-2025-06-03 00:14:37,968-file_handler-INFO-Saving file to: uploads\index.html
-2025-06-03 00:14:38,032-file_handler-INFO-Split content into 9 chunks.
-2025-06-03 00:14:38,033-__main__-INFO-Fetched file_type_2
-2025-06-03 00:14:38,033-__main__-INFO-Sending file_type_2 to loader
-2025-06-03 00:14:38,033-file_handler-INFO-Loading file type: code for group: 2
-2025-06-03 00:14:38,033-file_handler-INFO-Validating File Type
-2025-06-03 00:14:38,033-file_handler-INFO-Saving file to: uploads\app.py
-2025-06-03 00:14:38,036-file_handler-INFO-Split content into 2 chunks.
-2025-06-03 00:14:38,036-__main__-INFO-Fetched file_type_3
-2025-06-03 00:14:38,036-__main__-INFO-Sending file_type_3 to loader
-2025-06-03 00:14:38,036-file_handler-INFO-Loading file type: code for group: 3
-2025-06-03 00:14:38,036-file_handler-INFO-Validating File Type
-2025-06-03 00:14:38,036-file_handler-INFO-Saving file to: uploads\file_handler.py
-2025-06-03 00:14:38,038-file_handler-INFO-Split content into 3 chunks.
-2025-06-03 00:14:38,038-__main__-INFO-Chain Invoked
-2025-06-03 00:14:45,489-werkzeug-INFO-127.0.0.1 - - [03/Jun/2025 00:14:45] "POST / HTTP/1.1" 200 -
+2025-06-28 02:08:57,239-langchain_community.utils.user_agent-WARNING-USER_AGENT environment variable not set, consider setting it to identify your requests.
+2025-06-28 02:09:02,977-chromadb.telemetry.product.posthog-INFO-Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-06-28 02:09:03,037-rag_handler-INFO-Vectorstore initialized in memory
+2025-06-28 02:09:03,057-__main__-INFO-Initializing Gemini
+2025-06-28 02:09:03,073-werkzeug-INFO-[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-06-28 02:09:03,073-werkzeug-INFO-[33mPress CTRL+C to quit[0m
+2025-06-28 02:09:11,234-werkzeug-INFO-127.0.0.1 - - [28/Jun/2025 02:09:11] "GET / HTTP/1.1" 200 -
+2025-06-28 02:09:25,740-__main__-INFO-Uploading & processing files
+2025-06-28 02:09:25,745-file_handler-INFO-Loading file type: pdf for group: 1
+2025-06-28 02:09:25,746-file_handler-INFO-Validating File Type
+2025-06-28 02:09:25,746-file_handler-INFO-Saving file to: uploads\Adam_Optimizer.pdf
+2025-06-28 02:09:26,074-file_handler-INFO-Split content into 6 chunks.
+2025-06-28 02:09:26,074-__main__-INFO-Files uploaded & indexed successfully
+2025-06-28 02:09:26,074-__main__-INFO-Adding documents to vectorstore
+2025-06-28 02:09:28,395-werkzeug-INFO-127.0.0.1 - - [28/Jun/2025 02:09:28] "POST /upload HTTP/1.1" 200 -
+2025-06-28 02:09:40,202-__main__-INFO-Uploading & processing files
+2025-06-28 02:09:40,209-file_handler-INFO-Loading file type: pdf for group: 1
+2025-06-28 02:09:40,209-file_handler-INFO-Validating File Type
+2025-06-28 02:09:40,209-file_handler-INFO-Saving file to: uploads\Adam_Optimizer.pdf
+2025-06-28 02:09:40,331-file_handler-INFO-Split content into 6 chunks.
+2025-06-28 02:09:40,331-file_handler-INFO-Loading file type: code for group: 2
+2025-06-28 02:09:40,331-file_handler-INFO-Validating File Type
+2025-06-28 02:09:40,331-file_handler-INFO-Saving file to: uploads\app.py
+2025-06-28 02:09:40,347-file_handler-INFO-Split content into 3 chunks.
+2025-06-28 02:09:40,347-__main__-INFO-Files uploaded & indexed successfully
+2025-06-28 02:09:40,347-__main__-INFO-Adding documents to vectorstore
+2025-06-28 02:09:41,355-werkzeug-INFO-127.0.0.1 - - [28/Jun/2025 02:09:41] "POST /upload HTTP/1.1" 200 -
+2025-06-28 02:09:43,800-werkzeug-INFO-127.0.0.1 - - [28/Jun/2025 02:09:43] "GET /chat HTTP/1.1" 200 -
+2025-06-28 02:09:55,372-rag_handler-INFO-Retriever created from vectorstore.
+2025-06-28 02:09:55,402-sentence_transformers.SentenceTransformer-INFO-Load pretrained SentenceTransformer: Reranker\mxbai-embed-large-v1
+2025-06-28 02:09:59,032-sentence_transformers.SentenceTransformer-INFO-2 prompts are loaded, with the keys: ['query', 'passage']
+2025-06-28 02:09:59,032-rag_handler-INFO-Initializing Gemini for QnA.
+2025-06-28 02:09:59,035-rag_handler-INFO-Building QnA chain
+2025-06-28 02:09:59,036-rag_handler-INFO-DocumentQA initialized successfully
+2025-06-28 02:09:59,036-__main__-INFO-DocumentQA initialized for chat
+2025-06-28 02:09:59,036-rag_handler-INFO-Updating session Chat history with user query
+2025-06-28 02:10:00,438-rag_handler-INFO-Computed scores for 10 against the query.
+2025-06-28 02:10:00,438-rag_handler-INFO-Sorted scores for 10 documnets.
+2025-06-28 02:10:06,479-rag_handler-INFO-Updating session Chat history with LLM response
+2025-06-28 02:10:06,479-rag_handler-INFO-Query processed successfully, response length: 2580 and response time: 7.44269340000028
+2025-06-28 02:10:06,479-__main__-INFO-Query processed successfully in chat
+2025-06-28 02:10:06,483-werkzeug-INFO-127.0.0.1 - - [28/Jun/2025 02:10:06] "POST /chat HTTP/1.1" 200 -

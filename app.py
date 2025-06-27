@@ -5,20 +5,20 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableBranch, RunnableSequence, RunnablePassthrough
 from dotenv import load_dotenv
-from file_handler import File
-import logging
-import chromadb
 import secrets
-from rag_handler import DocumentQA, DocumentQAError, _vector_store
 from flask_session import Session
-
-load_dotenv()
+import logging
 
 logging.basicConfig(level=logging.INFO, 
                     filename='app.log', 
                     filemode='w', 
-                    format="%(asctime)s-%(name)s-%(levelname)s-%(message)s"
-                    )
+                    format="%(asctime)s-%(name)s-%(levelname)s-%(message)s")
+
+from file_handler import File
+from rag_handler import DocumentQA, DocumentQAError, _vector_store
+
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ def upload():
         _vector_store.add_documents(text)
     except Exception as e:
         logger.error(f"Failed to add documents to vectorstore: {e}")
-        return f"Error adding documents to vectorstore: {e}", 500
+        return f"Error adding documents to vectorstore", 500
 
     return "Files uploaded & indexed successfully!"
 
@@ -183,7 +183,6 @@ def chat():
                 doc_qa = DocumentQA(session)
                 logger.info("DocumentQA initialized for chat")
             except DocumentQAError as e:
-                logger.error(f"Failed to initialize DocumentQA: {e}")
                 return {"error": "Failed to initialize chat system"}, 500
             
             try:
@@ -205,4 +204,4 @@ def chat():
     
 
 if __name__ == '__main__':
-    app.run(debug=True, use_evalex=False)
+    app.run(debug=True, use_evalex=False, use_reloader=False)

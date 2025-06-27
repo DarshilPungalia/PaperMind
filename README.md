@@ -82,6 +82,12 @@ python app.py
 
 ---
 
+### 🙋‍♂️ Note on Frontend
+
+The frontend template used in this project was not created by me. My primary contributions lie in building the backend infrastructure, AI integration, and document-processing logic.
+
+---
+
 ### 📜 License
 
 This project is licensed under the MIT License

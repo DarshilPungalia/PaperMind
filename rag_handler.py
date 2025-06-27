@@ -1,24 +1,88 @@
-import chromadb
 from langchain_chroma import Chroma
 from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
-from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableSequence, RunnableLambda
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableSequence, RunnableLambda, Runnable
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_core.messages import HumanMessage, AIMessage
 import logging
-from typing import List, Union, Dict, Literal
+from typing import Union, Literal
 from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from flask.sessions import SessionMixin
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.util import cos_sim
 import time
+import torch
 
 
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+
+class DocumentQAError(Exception):
+    """Base exception for DocumentQA errors"""
+    pass
+
+class ChainBuildError(DocumentQAError):
+    """Raised when chain building fails"""
+    pass
+
+class VectorStoreError(DocumentQAError):
+    """Raised when vector store operations fail"""
+    pass
+
+class SessionError(DocumentQAError):
+    """Raised when session operations fail"""
+    pass
+
+class ReRankerError(DocumentQAError):
+    """Raised when re-ranker operations fail"""
+    pass
+
+class ReRanker(Runnable):
+    def __init__(self, dimensions: int = None, model_path: str = None):
+        self.cache = {}
+        self.dimensions = dimensions or 512
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model_path = model_path or r"Reranker\mxbai-embed-large-v1"
+        try:
+            logger.debug('Initializing Sentence Transformer')
+            if not self.cache.get('transformer', None):
+                self.cache['transformer'] = SentenceTransformer(self.model_path, truncate_dim=self.dimensions, device=self.device)
+        except Exception as e:
+            logger.critical(f"Couldn't get Sentence Transformer from {self.model_path}.")
+            raise ReRankerError(f"Couldn't get Sentence Transformer from {self.model_path}: {e}")
+
+    def invoke(self, inputs:dict, metadata:dict = None) -> list[Document]:
+        try:
+            query = [inputs["query"]]
+            documents = inputs['retrieved']
+            model = self.cache.get('transformer', None)
+
+            try:
+                start = time.perf_counter()
+                query_embed = model.encode(query, prompt_name="query")
+                docs_embed = [model.encode(document.page_content) for document in documents]
+                end = time.perf_counter()
+                logger.debug(f'Computed embeddings from query and {len(docs_embed)} documnets in {end-start} seconds.')
+            except Exception as e:
+                logger.error("Couldn't encode query or document(s).")
+                raise ReRankerError(f"Couldn't encode query or document(s): {e}")
+
+            scores = cos_sim(query_embed, docs_embed).tolist()[0]
+            logger.info(f'Computed scores for {len(scores)} against the query.')
+            
+            scored_docs = sorted(
+                zip(scores, documents), key=lambda x: x[0], reverse=True
+            )
+            logger.info(f'Sorted scores for {len(scored_docs)} documnets.')
+            return [doc for score, doc in scored_docs[:5]]
+        
+        except Exception as e:
+            raise ReRankerError(f'Could not Re-rank documents according to the query: {e}')
 
 class VectorStore:
     def __init__(self, collection_name="user", persist_directory=None):
@@ -31,13 +95,13 @@ class VectorStore:
         
     def _init_vectorstore(self):
         """
-        Create or load the shared persistent vector store.
+        Create or load the shared persistent or in-memory vector store.
         Call this ONCE at app startup.
         """
 
         if self._vectorstore is None:
             try:
-                embeddings = GoogleGenerativeAIEmbeddings(model='models/embedding-001')
+                embeddings = GoogleGenerativeAIEmbeddings(model='models/text-embedding-004')
                 logger.debug("Google Generative AI Embeddings initialized")
             except Exception as e:
                 logger.critical(f"Failed to initialize embeddings: {e}")
@@ -55,7 +119,7 @@ class VectorStore:
                 raise VectorStoreError(f"Failed to create vector store: {e}")
                 
         
-    def add_documents(self, documents: List[str])->None:
+    def add_documents(self, documents: list[str])->None:
         """
         Add parsed docs to the shared vector store.
         Call this in /upload route.
@@ -69,7 +133,7 @@ class VectorStore:
                 start = time.perf_counter()
                 self._vectorstore.add_texts(documents)
                 end = time.perf_counter()
-                logger.info(f"Successfully added {len(documents)} documents to vector store in {end-start} seconds")
+                logger.debug(f"Successfully added {len(documents)} documents to vector store in {end-start} seconds")
             except Exception as e:
                 logger.error(f"Failed to add documents to vector store: {e}")
                 raise VectorStoreError(f"Failed to add documents: {e}")
@@ -86,38 +150,21 @@ class VectorStore:
             if self._vectorstore is None:
                 raise RuntimeError("Vectorstore not initialized.")
             if self._retriever is None:
-                self._retriever = self._vectorstore.as_retriever(search_type=search_type)
+                self._retriever = self._vectorstore.as_retriever(search_type=search_type, search_kwargs={'k':10})
                 logger.info("Retriever created from vectorstore.")
             return self._retriever
         
         except Exception as e:
             raise VectorStoreError(f'Unable to create Retriever from Vector Store: {e}')
-
+            
+        
 _vector_store = VectorStore(persist_directory=None)
 
-class DocumentQAError(Exception):
-    """Base exception for DocumentQA errors"""
-    pass
-
-
-class ChainBuildError(DocumentQAError):
-    """Raised when chain building fails"""
-    pass
-
-
-class VectorStoreError(DocumentQAError):
-    """Raised when vector store operations fail"""
-    pass
-
-
-class SessionError(DocumentQAError):
-    """Raised when session operations fail"""
-    pass
 
 class ChatHistory:
     """Manages chat history using Flask session"""
     
-    def __init__(self, session: Union[SessionMixin, Dict]):
+    def __init__(self, session: Union[SessionMixin, dict]):
         try:
             if not isinstance(session, SessionMixin) and not isinstance(session, dict):
                 raise TypeError("Expected a Flask SessionMixin object")
@@ -146,11 +193,11 @@ class ChatHistory:
             logger.error(f"Failed to add message to chat history: {e}")
             raise SessionError(f"Failed to update chat history: {e}")
 
-    def get_history(self) -> List:
+    def get_history(self) -> list:
         """Get the complete chat history"""
         return self.session.get('chat_history', [])
     
-    def format_history_for_chain(self) ->List[Union[HumanMessage, AIMessage]]:
+    def format_history_for_chain(self) ->list[Union[HumanMessage, AIMessage]]:
         history = self.get_history()
         formatted_history = []
 
@@ -180,6 +227,7 @@ class DocumentQA():
             self.chat_history = ChatHistory(session)
             self.vector_store = vector_store or _vector_store
             self.retriever = self.vector_store.get_retriever(search_type='mmr')
+            self.re_ranker = ReRanker()
             self.chain = self.build_chain()
             
             logger.info("DocumentQA initialized successfully")
@@ -189,7 +237,7 @@ class DocumentQA():
             raise DocumentQAError(f"Failed to initialize DocumentQA: {e}")
 
     @staticmethod
-    def combine_context(documents: List[Document]) -> str:
+    def combine_context(documents: list[Document]) -> str:
         """Combine retrieved documents into a single context string"""
         try:
             context = "\n\n".join(document.page_content for document in documents if document.page_content)
@@ -215,26 +263,9 @@ class DocumentQA():
             raise ChainBuildError(f"Gemini Couldn't be initialized for QnA: {e}")
 
         prompt = PromptTemplate(
-            template='''You are PaperMind — an intelligent and helpful assistant that answers user queries using the provided document context.
-            Always prioritize the information found in the document. Use it as your **primary source of truth**. Your goal is to extract and present factual, 
-            relevant information clearly and concisely.
-            If the document is specific (e.g., a company report, research paper, resume, or technical spec), stick strictly to its contents when answering.
-            Use the chat history to follow the flow of the conversation and maintain natural continuity without repeating previous answers unless needed.
-            If the user asks something the document does **not** address — and you are confident you can answer it correctly — you **may** do so, 
-            but clearly **warn** the user that the information is not present in the document and is based on your own knowledge.
-            Avoid guessing, hallucinating, or referencing irrelevant information. Do not include general examples unless they directly help clarify the answer.
-            Keep your tone clear, professional, and supportive.
-
-            ---
-            
-            **Instructions:**
-
-            • Use only the document and chat history to answer the query, unless otherwise specified.  
-            • If the document includes structured data (tables, lists, metrics), highlight key points clearly.  
-            • Ignore irrelevant document sections.  
-            • Maintain conversational flow across follow-up questions.  
-            • Be concise — focus on clarity, accuracy, and relevance.
-
+            template='''Your name is PaperMind. Answer the user query with the help of the document provided.Ignore parts present in context which are irrelevant to the query. For document 
+            specific questions which can be personal info, company info, etc stick to it. If the document doesn't contain any info regarding query and if you are capable of CORRECTLY 
+            answering it, do so by WARNING the user clearly that the document didn't have the given info but you think the answer is this. But for the most part try to STICK TO THE DOCUMENT only.
             document:{document}
 
             Use this chat history to have a context of the chat.
@@ -246,7 +277,7 @@ class DocumentQA():
 
         try:
             input_chain = RunnableParallel({
-                'document': self.retriever | RunnableLambda(self.combine_context),
+                'document': RunnableParallel({'retrieved': self.retriever, 'query': RunnablePassthrough()}) | self.re_ranker | RunnableLambda(self.combine_context),
                 'query': RunnablePassthrough(),
                 'chat_history':RunnableLambda(lambda _ :self.chat_history.format_history_for_chain)
             })
@@ -301,7 +332,7 @@ class DocumentQA():
         return self.retriever
 
     
-    def get_chat_history(self) -> List:
+    def get_chat_history(self) -> list:
         """Get the chat history"""
         try:
             logger.info('Fetching Chat history from the session')
