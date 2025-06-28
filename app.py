@@ -99,6 +99,8 @@ def upload():
 
     if 'raw_text' not in session:
         session['raw_text'] = None
+    if 'is_uploaded' not in session:
+        session['is_uploaded'] = []
 
     input_groups = set()
     for key in request.form.keys():
@@ -107,10 +109,16 @@ def upload():
             input_groups.add(group_id)
 
     for group_id in sorted(input_groups):
-        file_type = request.form.get(f'file_type_{group_id}')
-        if file_type:
-            content = files.file_loader(file_type, request, group_id)
-            text.extend(content)
+        file_id = f'file_type_{group_id}'
+        if file_id not in session['is_uploaded']:
+            file_type = request.form.get(file_id)
+            if file_type:
+                content = files.file_loader(file_type, request, group_id)
+                text.extend(content)
+
+                is_uploaded = session.get('is_uploaded', [])
+                is_uploaded.append(f'file_type_{group_id}')
+                session['is_uploaded'] = is_uploaded
 
     if len(text) == 0:
         return "No content to process", 400
