@@ -3,7 +3,6 @@ from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableSequence, RunnableLambda, Runnable
 from langchain_core.documents import Document
-from langchain_core.prompts import PromptTemplate
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_core.messages import HumanMessage, AIMessage
 import logging
@@ -15,6 +14,7 @@ from sentence_transformers import SentenceTransformer
 from sentence_transformers.util import cos_sim
 import time
 import torch
+from .prompts import Prompts
 
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class ReRanker(Runnable):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model_path = model_path or r"Reranker\mxbai-embed-large-v1"
         try:
-            logger.debug('Initializing Sentence Transformer')
+            logger.debug(f'Initializing Sentence Transformer using {self.device}')
             if not self.cache.get('transformer', None):
                 self.cache['transformer'] = SentenceTransformer(self.model_path, truncate_dim=self.dimensions, device=self.device)
         except Exception as e:
@@ -262,18 +262,7 @@ class DocumentQA():
             logger.critical("Gemini Couldn't be initialized for QnA.", exc_info=True, stack_info=True)
             raise ChainBuildError(f"Gemini Couldn't be initialized for QnA: {e}")
 
-        prompt = PromptTemplate(
-            template='''Your name is PaperMind. Answer the user query with the help of the document provided.Ignore parts present in context which are irrelevant to the query. For document 
-            specific questions which can be personal info, company info, etc stick to it. If the document doesn't contain any info regarding query and if you are capable of CORRECTLY 
-            answering it, do so by WARNING the user clearly that the document didn't have the given info but you think the answer is this. But for the most part try to STICK TO THE DOCUMENT only.
-            document:{document}
-
-            Use this chat history to have a context of the chat.
-            chat_history:{chat_history}
-            
-            query:{query}''',
-            input_variables=['query', 'document', 'chat_history']
-        )
+        prompt = Prompts.QAPrompt
 
         try:
             input_chain = RunnableParallel({

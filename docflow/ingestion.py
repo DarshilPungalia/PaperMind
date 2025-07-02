@@ -298,18 +298,18 @@ class File():
         return is_yt, video_id
 
 
-    def file_loader(self, file_type: str, request, group_id: int, upload_time: str)-> tuple[list[str], dict]:
+    def file_loader(self, file_type: str, request, group_id: int, upload_time: float)-> tuple[list[str], dict]:
         logger.info(f"Loading file type: {file_type} for group: {group_id}")
         content = ''
         splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=256, separators=['\n\n', '\n', '.', '?', '!', ' ', ''])
 
         try:
             if file_type == 'text':
-                file_path, _, filename = self.file_save(request.files.get(f'file_{group_id}'), 'text')
+                file_path, ext, filename = self.file_save(request.files.get(f'file_{group_id}'), 'text')
                 loader = TextLoader(file_path)
 
             elif file_type == 'pdf':
-                file_path, _, filename = self.file_save(request.files.get(f'file_{group_id}'), 'pdf')
+                file_path, ext, filename = self.file_save(request.files.get(f'file_{group_id}'), 'pdf')
                 loader = PyMuPDFLoader(file_path, mode="page", images_inner_format="text", images_parser=RapidOCRBlobParser())
 
             elif file_type == 'code':
@@ -352,6 +352,6 @@ class File():
         
         chunks = splitter.split_text(content)
         logger.info(f"Split content into {len(chunks)} chunks.")
-        t =  self.EXTENSION_TO_MIME.get(ext, None) or 'text/uri-list' if file_type == 'link' else 'text/plain'
+        t =  self.EXTENSION_TO_MIME.get(ext, 'text/plain')
         metadata = {'name': filename, 'type': t, 'uploaded_at': upload_time}
         return chunks, metadata
