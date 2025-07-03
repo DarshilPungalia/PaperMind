@@ -192,7 +192,6 @@ def chat():
                 logger.info("Query processed successfully in chat")
                 return {"response": response}
             except DocumentQAError as e:
-                logger.error(f"Failed to process query in chat: {e}")
                 return {"error": "Failed to process your question"}, 500
                 
         except Exception as e:

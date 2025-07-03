@@ -112,6 +112,7 @@ class VectorStore:
                     collection_name="user",
                     embedding_function=embeddings,
                     collection_metadata={"hnsw:space": "cosine"},
+                    persist_directory=self.persist_directory
                 )
                 logger.info(f"Vectorstore initialized in memory")
             except Exception as e:
@@ -158,7 +159,7 @@ class VectorStore:
             raise VectorStoreError(f'Unable to create Retriever from Vector Store: {e}')
             
         
-_vector_store = VectorStore(persist_directory=None)
+_vector_store = VectorStore(persist_directory=r'MindVectorStore')
 
 
 class ChatHistory:
@@ -220,7 +221,7 @@ class ChatHistory:
         self.session['chat_history'] = []
 
 
-class DocumentQA():
+class DocumentQA:
     """A complete document-based question-answering system with RAG capabilities"""
     def __init__(self, session: SessionMixin, vector_store: VectorStore=None):        
         try:
