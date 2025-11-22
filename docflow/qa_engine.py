@@ -120,7 +120,7 @@ class VectorStore:
                 raise VectorStoreError(f"Failed to create vector store: {e}")
                 
         
-    def add_documents(self, documents: list[str])->None:
+    def add_documents(self, documents: list[dict])->None:
         """
         Add parsed docs to the shared vector store.
         Call this in /upload route.
@@ -130,9 +130,13 @@ class VectorStore:
                 raise ValueError("No documents provided to add.")
             if self._vectorstore is None:
                 raise RuntimeError("Vectorstore not initialized. Call init_vectorstore() first.")
+            
+            texts = [doc['text'] for doc in documents]
+            metadatas = [doc['metadata'] for doc in documents]
+
             try:
                 start = time.perf_counter()
-                self._vectorstore.add_texts(documents)
+                self._vectorstore.add_texts(texts, metadatas=metadatas)
                 end = time.perf_counter()
                 logger.debug(f"Successfully added {len(documents)} documents to vector store in {end-start} seconds")
             except Exception as e:
@@ -229,7 +233,7 @@ class DocumentQA:
             self.vector_store = vector_store or _vector_store
             self.retriever = self.vector_store.get_retriever(search_type='mmr')
             self.re_ranker = ReRanker()
-            self.chain = self.build_chain()
+            self.qa_chain, self.retriever_chain = self.build_chain()
             
             logger.info("DocumentQA initialized successfully")
             
@@ -238,17 +242,45 @@ class DocumentQA:
             raise DocumentQAError(f"Failed to initialize DocumentQA: {e}")
 
     @staticmethod
-    def combine_context(documents: list[Document]) -> str:
-        """Combine retrieved documents into a single context string"""
+    def combine_context(documents: list[Document]) -> dict:
+        """Combine retrieved documents and extract source information"""
         try:
-            context = "\n\n".join(document.page_content for document in documents if document.page_content)
+            context_parts = []
+            sources = []
+            seen_sources = set()
+            
+            for i, document in enumerate(documents, 1):
+                if document.page_content:
+                    context_parts.append(f"[{i}] {document.page_content}")
+                    
+                    metadata = document.metadata
+                    source_name = metadata.get('name', 'Unknown')
+                    doc_id = metadata.get('doc_id', 'unknown')
+                    
+                    if doc_id not in seen_sources:
+                        sources.append({
+                            'id': doc_id,
+                            'name': source_name,
+                            'type': metadata.get('type', 'text/plain'),
+                            'chunk_id': metadata.get('chunk_id', 0)
+                        })
+                        seen_sources.add(doc_id)
+            
+            context = "\n\n".join(context_parts)
             logger.debug(f"Combined context from {len(documents)} documents, total length: {len(context)}")
-            return context if context.strip() else "No relevant context found."
+            
+            return {
+                'context': context if context.strip() else "No relevant context found.",
+                'sources': sources
+            }
         except Exception as e:
             logger.error(f"Failed to combine context: {e}")
-            return "Error processing context."
+            return {
+                'context': "Error processing context.",
+                'sources': []
+            }
     
-    def build_chain(self) -> RunnableSequence:
+    def build_chain(self) -> tuple[RunnableSequence, RunnableSequence]:
         """Build the RAG chain"""
         parser = StrOutputParser()
 
@@ -266,22 +298,17 @@ class DocumentQA:
         prompt = Prompts.QAPrompt
 
         try:
-            input_chain = RunnableParallel({
-                'document': RunnableParallel({'retrieved': self.retriever, 'query': RunnablePassthrough()}) | self.re_ranker | RunnableLambda(self.combine_context),
-                'query': RunnablePassthrough(),
-                'chat_history':RunnableLambda(lambda _ :self.chat_history.format_history_for_chain)
-            })
+            retriever_chain = RunnableParallel({'retrieved': self.retriever, 'query': RunnablePassthrough()}) | self.re_ranker | RunnableLambda(self.combine_context)
 
             logger.info('Building QnA chain')
-            chain = RunnableSequence(input_chain,
-                                    prompt,
+            qa_chain = RunnableSequence(prompt,
                                     gemini,
                                     parser)
         except Exception as e:
             logger.error(f'Failed to build QnA chain: {e}')
             raise ChainBuildError(f'Failed to build QnA chain: {e}')
         
-        return chain    
+        return qa_chain, retriever_chain    
     
     def invoke(self, user_query: str) -> str:
         """Process a user query and return the response"""
@@ -291,10 +318,19 @@ class DocumentQA:
         
         logger.info('Updating session Chat history with user query')
         self.chat_history.add_message(user_query)
+
+        chat_history = self.chat_history.format_history_for_chain()
+        documents = self.retriever_chain.invoke(user_query)
+
+        message = {
+            'query': user_query,
+            'document': documents["context"],
+            'chat_history': chat_history
+        }
         
         try:
             start = time.perf_counter()
-            response = self.chain.invoke(user_query)
+            response = self.qa_chain.invoke(message)
             end = time.perf_counter()
 
         except Exception as e:
@@ -308,7 +344,7 @@ class DocumentQA:
         self.chat_history.add_message(response)
         
         logger.info(f"Query processed successfully, response length: {len(response)} and response time: {end-start}")
-        return response
+        return response, documents["sources"]
     
     def get_vectorstore(self) -> Chroma:
         """Get the underlying vector store"""

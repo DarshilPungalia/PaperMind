@@ -188,9 +188,9 @@ def chat():
                 return {"error": "Failed to initialize chat system"}, 500
             
             try:
-                response = doc_qa.invoke(user_query)
+                response, sources = doc_qa.invoke(user_query)
                 logger.info("Query processed successfully in chat")
-                return {"response": response}
+                return {"response": response, "sources": sources}
             except DocumentQAError as e:
                 return {"error": "Failed to process your question"}, 500
                 

@@ -506,6 +506,53 @@ footer {
     background-color: #0066cc;
 }
 
+.sources-container {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sources-header {
+    font-size: 12px;
+    color: #888;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sources-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.source-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #aaa;
+    padding: 6px 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.source-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.source-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.source-name {
+    flex: 1;
+    word-break: break-word;
+}
+
 /*.files-count {
     position: absolute;
     top: -5px;

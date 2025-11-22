@@ -60,7 +60,7 @@ marked.setOptions({
                 if (data.error) {
                     addMessage(data.error, 'error');
                 } else {
-                    addMessage(data.response, 'assistant');
+                    addMessage(data.response, 'assistant', data.sources);
                 }
                 
             } catch (error) {
@@ -77,29 +77,34 @@ marked.setOptions({
             }
         });
 
-        function addMessage(content, role) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}`;
-            
-            // Render markdown if it looks like markdown
-            if (isMarkdownContent(content)) {
-                messageDiv.innerHTML = marked.parse(content);
-            } else {
-                messageDiv.textContent = content;
-            }
-            
-            chatMessages.insertBefore(messageDiv, typingIndicator);
-            scrollToBottom();
-        }
+function addMessage(content, role, sources = null) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    if (isMarkdownContent(content)) {
+        messageDiv.innerHTML = marked.parse(content);
+    } else {
+        messageDiv.textContent = content;
+    }
+    
+    // Add sources if available and role is assistant
+    if (role === 'assistant' && sources && sources.length > 0) {
+        const sourcesElement = createSourcesElement(sources);
+        messageDiv.innerHTML += sourcesElement;
+    }
+    
+    chatMessages.insertBefore(messageDiv, typingIndicator);
+    scrollToBottom();
+}
 
-        function showTypingIndicator() {
-            typingIndicator.style.display = 'flex';
-            scrollToBottom();
-        }
+function showTypingIndicator() {
+    typingIndicator.style.display = 'flex';
+    scrollToBottom();
+}
 
-        function hideTypingIndicator() {
-            typingIndicator.style.display = 'none';
-        }
+function hideTypingIndicator() {
+    typingIndicator.style.display = 'none';
+}
 
         function scrollToBottom() {
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -123,8 +128,29 @@ marked.setOptions({
             
             return markdownIndicators.some(pattern => pattern.test(content));
         }
+
+function createSourcesElement(sources) {
+    if (!sources || sources.length === 0) return '';
     
-// Sidebar functionality
+    const uniqueSources = Array.from(new Map(sources.map(s => [s.id, s])).values());
+    
+    const sourcesHtml = `
+        <div class="sources-container">
+            <div class="sources-header">Sources:</div>
+            <div class="sources-list">
+                ${uniqueSources.map(source => `
+                    <div class="source-item">
+                        <span class="source-icon">📄</span>
+                        <span class="source-name">${escapeHtml(source.name)}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    return sourcesHtml;
+}
+    
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');

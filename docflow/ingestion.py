@@ -302,6 +302,7 @@ class File():
         logger.info(f"Loading file type: {file_type} for group: {group_id}")
         content = ''
         splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=256, separators=['\n\n', '\n', '.', '?', '!', ' ', ''])
+        ext = None
 
         try:
             if file_type == 'text':
@@ -352,6 +353,13 @@ class File():
         
         chunks = splitter.split_text(content)
         logger.info(f"Split content into {len(chunks)} chunks.")
+
         t =  self.EXTENSION_TO_MIME.get(ext, 'text/plain')
-        metadata = {'name': filename, 'type': t, 'uploaded_at': upload_time}
-        return chunks, metadata
+        metadata = {'name': filename, 'type': t, 'uploaded_at': upload_time, 'doc_id': f"doc_{group_id}_{upload_time}"}
+
+        chunks_with_metadata = [
+        {'text': chunk, 'metadata': {**metadata, 'chunk_id': i}} 
+        for i, chunk in enumerate(chunks)
+        ]
+
+        return chunks_with_metadata, metadata
